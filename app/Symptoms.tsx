@@ -71,7 +71,7 @@ const symptoms: Symptom[] = [
     icon: "body-outline",
     color: "#E91E63",
     lightColor: "#FCE4EC",
-    description: "Lower or upper back discomfort",
+    description: "Back discomfort",
   },
   {
     id: 5,
