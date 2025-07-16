@@ -37,7 +37,7 @@ const ChatScreen = () => {
   useEffect(() => {
     const fetchMessages = async () => {
       const token = await AsyncStorage.getItem("token");
-      const response = await fetch(`http://10.232.66.19:5000/api/messages/${currentUserId}`, {
+      const response = await fetch(`https://pregwell-backend.onrender.com/api/messages/${currentUserId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 

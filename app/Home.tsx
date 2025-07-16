@@ -258,7 +258,7 @@ const HomeScreen = () => {
       const userId = await AsyncStorage.getItem("userId")
       if (!token || !userId) throw new Error("User not authenticated")
 
-      const response = await fetch(`http://10.232.66.19:5000/api/patients/profile/${userId}`, {
+      const response = await fetch(`https://pregwell-backend.onrender.com/api/patients/profile/${userId}`, {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,

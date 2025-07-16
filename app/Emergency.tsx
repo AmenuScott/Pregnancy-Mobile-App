@@ -86,7 +86,7 @@ export default function EmergencyScreen() {
 
   const fetchContacts = async () => {
     try {
-      const res = await fetch(`http://10.232.66.19:5000/api/emergency_contacts/${userId}`)
+      const res = await fetch(`https://pregwell-backend.onrender.com/api/emergency_contacts/${userId}`)
       const data = await res.json()
       setEmergencyContacts(data.contacts || [])
     } catch (err) {
@@ -101,7 +101,7 @@ export default function EmergencyScreen() {
     }
 
     try {
-      const res = await fetch(`http://10.232.66.19:5000/api/emergency_contacts/${userId}`, {
+      const res = await fetch(`https://pregwell-backend.onrender.com/api/emergency_contacts/${userId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, number, description }),
@@ -132,7 +132,7 @@ export default function EmergencyScreen() {
         style: "destructive",
         onPress: async () => {
           try {
-            await fetch(`http://10.232.66.19:5000/api/emergency_contacts/${userId}/${contactId}`, { method: "DELETE" })
+            await fetch(`https://pregwell-backend.onrender.com/api/emergency_contacts/${userId}/${contactId}`, { method: "DELETE" })
             fetchContacts()
             Alert.alert("Deleted", `${contactName} removed.`)
           } catch (err) {

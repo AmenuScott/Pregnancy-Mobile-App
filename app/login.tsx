@@ -33,7 +33,7 @@ const handleLogin = async () => {
 
   setLoading(true);
   try {
-    const response = await fetch("http://10.232.66.19:5000/api/patients/login", {
+    const response = await fetch("https://pregwell-backend.onrender.com/api/patients/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),

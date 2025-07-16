@@ -43,7 +43,7 @@ const Header: React.FC<HeaderProps> = ({ token }) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch('http://10.132.249.168:5000/api/users/profile', {
+      const response = await fetch('https://pregwell-backend.onrender.com/api/users/profile', {
         headers: {
           Authorization: `Bearer ${token}`,
         },

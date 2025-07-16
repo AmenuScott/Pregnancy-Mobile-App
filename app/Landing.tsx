@@ -35,7 +35,7 @@ const LandingScreen = () => {
         return
       }
 
-      const response = await fetch("http://10.232.66.19:5000/api/patients/verify", {
+      const response = await fetch("https://pregwell-backend.onrender.com/api/patients/verify", {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,

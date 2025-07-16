@@ -23,7 +23,7 @@ export default function NewChatsScreen() {
       try {
         const token = await AsyncStorage.getItem("token");
         const userId = await AsyncStorage.getItem("userId");
-        const response = await fetch("http://10.232.66.19:5000/api/patients", {
+        const response = await fetch("https://pregwell-backend.onrender.com/api/patients", {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!response.ok) throw new Error("Failed to fetch users");

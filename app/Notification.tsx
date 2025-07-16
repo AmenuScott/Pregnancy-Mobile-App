@@ -345,7 +345,7 @@ const Notifications = () => {
         },
       ]}
     >
-      <Ionicons name="notifications-off-outline" size={64} color="#E0E0E0" />
+      <Ionicons name="notifications-off-outline" size={64} color="#000000ff" />
       <Text style={styles.emptyTitle}>No notifications</Text>
       <Text style={styles.emptySubtitle}>
         {selectedFilter === "unread"
@@ -506,7 +506,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: "rgba(0, 0, 0, 0.2)",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -526,7 +526,7 @@ const styles = StyleSheet.create({
   headerContainer: {
     marginBottom: 20,
     borderRadius: 20,
-    shadowColor: "#9C27B0",
+    shadowColor: "#c972d8ff",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 15,
@@ -552,7 +552,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 22,
     fontWeight: "bold",
-    color: "white",
+    color: "Black",
   },
   headerSubtitle: {
     fontSize: 14,
@@ -590,7 +590,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   activeFilterTab: {
-    backgroundColor: "#9C27B0",
+    backgroundColor: "#ae67baff",
   },
   filterText: {
     fontSize: 14,

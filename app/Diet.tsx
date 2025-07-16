@@ -200,7 +200,7 @@ const DietScreen = () => {
     const fetchProfile = async () => {
       const token = await AsyncStorage.getItem("token");
       const userId = await AsyncStorage.getItem("userId");
-      const response = await fetch(`http://10.232.66.19:5000/api/patients/profile/${userId}`, {
+      const response = await fetch(`https://pregwell-backend.onrender.com/api/patients/profile/${userId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await response.json();

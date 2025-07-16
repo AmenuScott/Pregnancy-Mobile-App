@@ -173,7 +173,7 @@ export default function SymptomsScreen() {
         const userId = await AsyncStorage.getItem("userId")
         if (!token || !userId) return
 
-        const response = await fetch(`http://10.232.66.19:5000/api/patients/profile/${userId}`, {
+        const response = await fetch(`https://pregwell-backend.onrender.com/api/patients/profile/${userId}`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (!response.ok) return
@@ -181,7 +181,7 @@ export default function SymptomsScreen() {
         setUserData({
           firstName: data.first_name,
           lastMenstrualPeriod: data.last_menstrual_period,
-          profilePicture: data.profile_picture, // Add this line if your API returns profile_picture
+          profilePicture: data.profile_picture, //  this line returns a URL to the profile picture
         })
 
         // Calculate pregnancy week and trimester
