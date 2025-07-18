@@ -1,5 +1,3 @@
-"use client"
-
 import { Ionicons } from "@expo/vector-icons"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { LinearGradient } from "expo-linear-gradient"
@@ -22,14 +20,6 @@ import {
 
 const { width } = Dimensions.get("window")
 
-const healthConditions = [
-  { id: "diabetes", name: "Diabetes", icon: "medical-outline", color: "#FF6B9D" },
-  { id: "hypertension", name: "High Blood Pressure", icon: "heart-outline", color: "#FF5722" },
-  { id: "asthma", name: "Asthma", icon: "fitness-outline", color: "#4ECDC4" },
-  { id: "thyroid", name: "Thyroid Issues", icon: "body-outline", color: "#FFA726" },
-  { id: "anemia", name: "Anemia", icon: "water-outline", color: "#9C27B0" },
-  { id: "allergies", name: "Allergies", icon: "leaf-outline", color: "#4CAF50" },
-]
 
 export default function SetupNew() {
   const router = useRouter()
@@ -116,12 +106,10 @@ export default function SetupNew() {
       }
 
       // ✅ FIXED: Using /api/setup/ endpoint and sending userId in body
-      const setupData = {
-        userId: finalUserId,  // Send userId in body instead of URL
+        const setupData = {
+        userId: finalUserId,
         lastMenstrualPeriod: lmp,
-        firstPregnancy: isFirstPregnancy,
-        healthConditions: selectedConditions,
-        otherCondition: otherCondition.trim(),
+        firstPregnancy: isFirstPregnancy,     
       }
 
       console.log("📲 Final User ID:", finalUserId);
@@ -155,9 +143,7 @@ export default function SetupNew() {
     setLoading(false)
   }
 
-  const progress =
-    ((lmp ? 1 : 0) + (isFirstPregnancy !== null ? 1 : 0) + (selectedConditions.length > 0 || otherCondition ? 1 : 0)) *
-    33.33
+  const progress = ((lmp ? 1 : 0) + (isFirstPregnancy !== null ? 1 : 0)) * 50
 
   return (
     <SafeAreaView style={s.container}>
@@ -244,49 +230,6 @@ export default function SetupNew() {
               </View>
             </View>
 
-            {/* Health Conditions */}
-            <View style={s.card}>
-              <View style={s.cardHeader}>
-                <Ionicons name="medical-outline" size={24} color="#4ECDC4" />
-                <Text style={s.cardTitle}>Health Conditions</Text>
-              </View>
-              <Text style={s.cardDesc}>Select any conditions that apply to you (optional)</Text>
-
-              <View style={s.conditionsGrid}>
-                {healthConditions.map((condition) => (
-                  <TouchableOpacity
-                    key={condition.id}
-                    style={[s.conditionCard, selectedConditions.includes(condition.id) && s.conditionSelected]}
-                    onPress={() => toggleHealthCondition(condition.id)}
-                  >
-                    <View style={[s.conditionIcon, { backgroundColor: `${condition.color}20` }]}>
-                      <Ionicons name={condition.icon as any} size={18} color={condition.color} />
-                    </View>
-                    <Text style={[s.conditionText, selectedConditions.includes(condition.id) && s.conditionTextActive]}>
-                      {condition.name}
-                    </Text>
-                    {selectedConditions.includes(condition.id) && (
-                      <View style={s.checkmark}>
-                        <Ionicons name="checkmark" size={12} color="white" />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <View style={s.inputContainer}>
-                <View style={s.inputWrapper}>
-                  <Ionicons name="add-outline" size={20} color="#4ECDC4" />
-                  <TextInput
-                    style={s.input}
-                    value={otherCondition}
-                    onChangeText={setOtherCondition}
-                    placeholder="Other condition (optional)"
-                    placeholderTextColor="#BDC3C7"
-                  />
-                </View>
-              </View>
-            </View>
 
             {/* Continue Button */}
             <TouchableOpacity
@@ -307,6 +250,7 @@ export default function SetupNew() {
     </SafeAreaView>
   )
 }
+
 
 const s = StyleSheet.create({
   container: { flex: 1 },
