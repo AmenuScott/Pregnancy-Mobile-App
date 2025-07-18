@@ -13,7 +13,7 @@ exports.savePregnancyProfile = async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const query = `
+    const insertQuery = `
       INSERT INTO pregnancy_profiles (
         id, user_id, last_menstrual_period, first_pregnancy, created_at
       )
@@ -27,14 +27,18 @@ exports.savePregnancyProfile = async (req, res) => {
       RETURNING *;
     `;
 
-    const values = [
-      userId,
-      lastMenstrualPeriod,
-      firstPregnancy
-    ];
+    const insertValues = [userId, lastMenstrualPeriod, firstPregnancy];
 
-    const result = await db.query(query, values);
+    const result = await db.query(insertQuery, insertValues);
+
+    // ✅ Now update profileCompleted to true
+    await db.query(
+      `UPDATE patients SET profileCompleted = true WHERE id = $1`,
+      [userId]
+    );
+
     res.json({ message: 'Setup saved', setup: result.rows[0] });
+
   } catch (error) {
     console.error('❌ Error saving setup:', error);
     res.status(500).json({ error: 'Server error' });
