@@ -31,9 +31,9 @@ exports.savePregnancyProfile = async (req, res) => {
 
     const result = await db.query(insertQuery, insertValues);
 
-    // ✅ Now update profileCompleted to true
+    // ✅ Now update profile_completed to true
     await db.query(
-      `UPDATE patients SET profileCompleted = true WHERE id = $1`,
+      `UPDATE patients SET profile_completed = true WHERE id = $1`,
       [userId]
     );
 
