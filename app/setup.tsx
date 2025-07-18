@@ -129,7 +129,7 @@ export default function SetupNew() {
       const data = await response.json()
 
       if (response.ok) {
-        await AsyncStorage.setItem("profileCompleted", "true")
+        await AsyncStorage.setItem("profile_completed", "true")
         Alert.alert("Success 🎉", "Your profile has been set up successfully!", [
           { text: "Continue", onPress: () => router.replace("/login") },
         ])
