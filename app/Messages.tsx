@@ -3,15 +3,15 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
+    ActivityIndicator,
+    FlatList,
+    Image,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
 
-  View,
+    View,
 } from "react-native";
 
 // Dummy contacts for new chat modal (optional)
@@ -35,7 +35,7 @@ const MessagesScreen = () => {
       const userId = await AsyncStorage.getItem("userId");
       if (!token || !userId) throw new Error("User not authenticated");
 
-      const response = await fetch(`http://10.232.66.19:5000/api/messages/${userId}`, {
+      const response = await fetch(`https://pregwell-backend.onrender.com/api/messages/${userId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) throw new Error("Failed to fetch messages");

@@ -7,15 +7,15 @@ import * as Location from "expo-location"
 import { useRouter } from "expo-router"
 import { useEffect, useState } from "react"
 import {
-  ActivityIndicator,
-  Alert,
-  Linking,
-  SafeAreaView,
-  ScrollView, Share, StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Linking,
+    SafeAreaView,
+    ScrollView, Share, StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from "react-native"
 
 const quickActions = [

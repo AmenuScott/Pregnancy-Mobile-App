@@ -1,5 +1,3 @@
-// backend/controllers/patientController.js
-
 const pool = require('../db');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
@@ -9,31 +7,24 @@ const JWT_SECRET = process.env.JWT_SECRET;
 exports.registeruser = async (req, res) => {
   const { first_name, last_name, email, password, dob } = req.body;
 
-  console.log("Incoming signup data:", { first_name, last_name, email, dob });
-
   if (!first_name || !last_name || !email || !password || !dob) {
-    console.log("❌ Missing required fields");
-    return res.status(400).json({ error: "All fields are required" });
+    return res.status(400).json({ message: "All fields are required" });
   }
 
   const normalizedEmail = email.toLowerCase();
 
   try {
-    console.log("🔍 Checking if user exists...");
     const existingUser = await pool.query(
       "SELECT * FROM patients WHERE email = $1",
       [normalizedEmail]
     );
 
     if (existingUser.rows.length > 0) {
-      console.log("❌ Email already exists");
-      return res.status(400).json({ error: "Email already exists" });
+      return res.status(400).json({ message: "Email already exists" });
     }
 
-    console.log("🔒 Hashing password...");
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    console.log("📥 Inserting user into database...");
     const result = await pool.query(
       `INSERT INTO patients 
         (first_name, last_name, email, password, dob, profile_completed) 
@@ -43,16 +34,8 @@ exports.registeruser = async (req, res) => {
     );
 
     const user = result.rows[0];
-    console.log("✅ User inserted:", user);
+    const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "7d" });
 
-    console.log("🔑 Generating token...");
-    const token = jwt.sign(
-      { id: user.id },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-
-    console.log("✅ Signup success, sending response...");
     res.status(201).json({
       token,
       userId: user.id,
@@ -60,19 +43,17 @@ exports.registeruser = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("🔥 Signup error caught:", error.message);
-    res.status(500).json({ error: "Server error during signup" });
+    console.error("🔥 Signup error:", error.message);
+    res.status(500).json({ message: "Server error during signup" });
   }
 };
-
-
 
 // LOGIN
 exports.loginUser = async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required' });
+    return res.status(400).json({ message: 'Email and password are required' });
   }
 
   try {
@@ -82,17 +63,17 @@ exports.loginUser = async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid email or password' });
+      return res.status(401).json({ message: 'Invalid email or password' });
     }
 
     const user = result.rows[0];
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-      return res.status(401).json({ error: 'Invalid email or password' });
+      return res.status(401).json({ message: 'Invalid email or password' });
     }
 
-    const profileCompleted = user.profile_completed; // <-- fix this line
+    const profileCompleted = user.profile_completed;
 
     const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, {
       expiresIn: '7d',
@@ -103,90 +84,72 @@ exports.loginUser = async (req, res) => {
     res.status(200).json({
       user: {
         ...userWithoutPassword,
-        profileCompleted, // this will now be true after setup
+        profileCompleted,
       },
       token,
     });
   } catch (err) {
     console.error('❌ Login error:', err);
-    res.status(401).json({ error: "Invalid credentials" });
+    res.status(401).json({ message: "Invalid credentials" });
   }
 };
 
-// COMPLETE SETUP
+// ✅ COMPLETE SETUP
 exports.completeSetup = async (req, res) => {
-  const userId = req.params.userId;
+  console.log("🚨 COMPLETESETUP FUNCTION CALLED!");
+  console.log("🔍 RAW REQUEST DATA:");
+  console.log("  - req.url:", req.url);
+  console.log("  - req.originalUrl:", req.originalUrl);
+  console.log("  - req.params:", req.params);
+  console.log("  - req.params.userId:", req.params.userId);
+
+  const { userId } = req.params;
   const {
-    last_menstrual_period,
-    first_pregnancy,
-    health_conditions,
-    other_condition,
+    lastMenstrualPeriod,
+    firstPregnancy,
+    healthConditions,
+    otherCondition
   } = req.body;
 
-  const userIdInt = parseInt(userId);
-  if (!userIdInt || isNaN(userIdInt)) {
+  if (!userId || typeof userId !== 'string') {
     return res.status(400).json({ error: 'Invalid user ID' });
   }
 
-  if (!last_menstrual_period) {
-    return res.status(400).json({ error: 'Last menstrual period is required' });
-  }
-
   try {
-    const existingProfile = await pool.query(
-      'SELECT * FROM pregnancy_profiles WHERE user_id = $1',
-      [userIdInt]
-    );
-
-    if (existingProfile.rows.length > 0) {
-      await pool.query(
-        `UPDATE pregnancy_profiles 
-         SET last_menstrual_period = $1, 
-             first_pregnancy = $2, 
-             health_conditions = $3, 
-             other_condition = $4 
-         WHERE user_id = $5`,
-        [
-          last_menstrual_period,
-          first_pregnancy || false,
-          health_conditions,
-          other_condition,
-          userIdInt,
-        ]
-      );
-    } else {
-      await pool.query(
-        `INSERT INTO pregnancy_profiles 
-         (user_id, last_menstrual_period, first_pregnancy, health_conditions, other_condition) 
-         VALUES ($1, $2, $3, $4, $5)`,
-        [
-          userIdInt,
-          last_menstrual_period,
-          first_pregnancy || false,
-          health_conditions,
-          other_condition,
-        ]
-      );
-    }
-
+    // Insert into pregnancy_profiles
     await pool.query(
-      'UPDATE patients SET profile_completed = true WHERE id = $1',
-      [userIdInt]
+      `INSERT INTO pregnancy_profiles 
+        (user_id, last_menstrual_period, first_pregnancy, health_conditions, other_condition, created_at)
+        VALUES ($1, $2, $3, $4, $5, NOW())`,
+      [
+        userId,
+        lastMenstrualPeriod,
+        firstPregnancy,
+        JSON.stringify(healthConditions),
+        otherCondition
+      ]
     );
 
-    res.status(200).json({ message: 'Setup completed successfully' });
+    // Update patients table
+    await pool.query(
+      'UPDATE patients SET profile_completed = $1 WHERE id = $2',
+      [true, userId]
+    );
+
+    res.status(201).json({ message: 'Setup completed and saved ✅' });
   } catch (error) {
-    console.error('Setup error:', error);
-    res.status(500).json({ error: 'Server error during setup' });
+    console.error('❌ Setup error:', error);
+    res.status(500).json({ error: 'Setup failed' });
   }
 };
 
-// GET PROFILE (for home screen)
+
+
+// ✅ GET PROFILE
 exports.getProfile = async (req, res) => {
   const { userId } = req.params;
-  const userIdInt = parseInt(userId);
 
-  if (!userIdInt || isNaN(userIdInt)) {
+  if (!userId || typeof userId !== 'string') {
     return res.status(400).json({ error: 'Invalid user ID' });
   }
 
@@ -198,7 +161,7 @@ exports.getProfile = async (req, res) => {
        FROM patients p
        LEFT JOIN pregnancy_profiles pp ON p.id = pp.user_id
        WHERE p.id = $1`,
-      [userIdInt]
+      [userId]
     );
 
     if (result.rows.length === 0) {
@@ -212,52 +175,24 @@ exports.getProfile = async (req, res) => {
   }
 };
 
-// SETUP PROFILE
-exports.setupProfile = async (req, res) => {
-  const { userId } = req.params;
-  const { last_menstrual_period, first_pregnancy, health_conditions, other_condition } = req.body;
-
-  try {
-    // Save profile data (update as needed for your schema)
-    await pool.query(
-      `UPDATE patients SET 
-        last_menstrual_period = $1,
-        first_pregnancy = $2,
-        health_conditions = $3,
-        other_condition = $4,
-        profile_completed = true
-      WHERE id = $5`,
-      [
-        last_menstrual_period,
-        first_pregnancy,
-        JSON.stringify(health_conditions),
-        other_condition,
-        userId
-      ]
-    );
-
-    res.status(200).json({ message: "Profile setup complete", profileCompleted: true });
-  } catch (error) {
-    console.error("Profile setup error:", error);
-    res.status(500).json({ error: "Failed to complete profile setup" });
-  }
-};
-
-// GET ALL PATIENTS
+// ✅ GET ALL PATIENTS
 exports.getAllPatients = async (req, res) => {
   try {
     const patients = await pool.query(
       'SELECT id, first_name, last_name, email, profile_picture FROM patients'
     );
+
     const users = patients.rows.map(p => ({
       id: p.id,
       name: `${p.first_name} ${p.last_name}`,
       avatar: p.profile_picture || null,
       email: p.email,
-      online: true // or false if you don't track online status
+      online: true // update this if you track presence
     }));
-    res.json(users); // <-- Make sure this is present!
+
+    res.json(users);
   } catch (err) {
+    console.error('Get all patients error:', err);
     res.status(500).json({ error: "Failed to fetch patients" });
   }
 };

@@ -14,6 +14,7 @@ const tipRoutes = require("./routes/tipRoutes");
 const exerciseRoutes = require("./routes/exerciseRoutes");
 const emergencyRoutes = require("./routes/emergencyRoutes");
 const messageRoutes = require("./routes/messagesRoutes");
+const healthRoutes = require("./routes/healthRoutes");
 
 const app = express();
 const server = http.createServer(app);
@@ -39,6 +40,7 @@ app.use("/api/tips", tipRoutes);
 app.use("/api/exercises", exerciseRoutes);
 app.use("/api/emergency", emergencyRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/health", healthRoutes);
 
 // Base route
 app.get("/", (req, res) => {

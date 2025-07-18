@@ -105,6 +105,9 @@ export default function SetupNew() {
         return
       }
 
+      console.log("🔍 userId prop:", userId);
+      console.log("🔍 AsyncStorage userId:", await AsyncStorage.getItem("userId"));
+        
       const finalUserId = userId || (await AsyncStorage.getItem("userId"))
       if (!finalUserId) {
         Alert.alert("Missing User", "User ID not found. Please log in again.")
@@ -112,14 +115,21 @@ export default function SetupNew() {
         return
       }
 
+      // ✅ FIXED: Using /api/setup/ endpoint and sending userId in body
       const setupData = {
-        last_menstrual_period: lmp,
-        first_pregnancy: isFirstPregnancy,
-        health_conditions: selectedConditions,
-        other_condition: otherCondition.trim(),
+        userId: finalUserId,  // Send userId in body instead of URL
+        lastMenstrualPeriod: lmp,
+        firstPregnancy: isFirstPregnancy,
+        healthConditions: selectedConditions,
+        otherCondition: otherCondition.trim(),
       }
 
-      const response = await fetch(`https://pregwell-backend.onrender.com/api/patients/setup/${finalUserId}`, {
+      console.log("📲 Final User ID:", finalUserId);
+      console.log("📲 Setup URL:", `https://pregwell-backend.onrender.com/api/setup/`);
+      console.log("📲 Setup Data:", setupData);
+
+      // ✅ FIXED: Changed endpoint to /api/setup/ (no userId in URL)
+      const response = await fetch(`https://pregwell-backend.onrender.com/api/setup/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
