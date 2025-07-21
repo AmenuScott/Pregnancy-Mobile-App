@@ -12,34 +12,18 @@ exports.scrapeTips = async (req, res) => {
     });
 
     const page = await browser.newPage();
-    await page.goto("https://www.babycenter.com/pregnancy", {
-      waitUntil: "domcontentloaded",
-    });
+    await page.goto("https://www.babycenter.com/pregnancy");
 
+    // Example scraping logic (replace with what you need)
     const tips = await page.evaluate(() => {
-      const elements = Array.from(document.querySelectorAll("a"));
-      return elements
-        .map((el) => ({
-          title: el.innerText.trim(),
-          link: el.href,
-        }))
-        .filter((tip) => tip.title && tip.link);
+      return Array.from(document.querySelectorAll("h2")).map((el) => el.innerText);
     });
 
     await browser.close();
 
-    for (const tip of tips) {
-      await pool.query(
-        `INSERT INTO tips (title, link, source, scraped_at)
-         VALUES ($1, $2, $3, NOW())
-         ON CONFLICT DO NOTHING`,
-        [tip.title, tip.link, "BabyCenter"]
-      );
-    }
-
-    res.status(200).json({ message: "Scraped and saved tips!", count: tips.length });
+    res.json({ message: "Scraped and saved tips!", count: tips.length, tips });
   } catch (error) {
-    console.error("Scrape error:", error.message);
+    console.error(error);
     res.status(500).json({ message: "Scraping failed", error: error.message });
   }
 };
