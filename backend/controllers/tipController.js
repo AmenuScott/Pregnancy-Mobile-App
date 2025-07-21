@@ -1,28 +1,24 @@
 // controllers/tipController.js
 const pool = require("../db");
-const chromium = require("chrome-aws-lambda");
-const puppeteer = require("puppeteer-core");
+const axios = require("axios");
+const cheerio = require("cheerio");
 
 exports.scrapeTips = async (req, res) => {
   try {
-    const browser = await puppeteer.launch({
-      args: chromium.args,
-      executablePath: await chromium.executablePath || "/usr/bin/chromium-browser",
-      headless: true,
+    const { data: html } = await axios.get("https://www.babycenter.com/pregnancy");
+
+    const $ = cheerio.load(html);
+
+    // Example: Scrape all headings inside article sections
+    const tips = [];
+
+    $("article h2").each((i, el) => {
+      tips.push($(el).text().trim());
     });
 
-    const page = await browser.newPage();
-    await page.goto("https://www.babycenter.com/pregnancy", { waitUntil: "domcontentloaded" });
-
-    const tips = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll("h2")).map((el) => el.innerText);
-    });
-
-    await browser.close();
-
-    res.json({ message: "Scraped and saved tips!", count: tips.length, tips });
+    res.json({ message: "Scraped tips using cheerio!", count: tips.length, tips });
   } catch (error) {
-    console.error(error);
+    console.error("Scraping failed:", error.message);
     res.status(500).json({ message: "Scraping failed", error: error.message });
   }
 };
