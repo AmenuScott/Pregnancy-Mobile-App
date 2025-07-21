@@ -7,14 +7,13 @@ exports.scrapeTips = async (req, res) => {
   try {
     const browser = await puppeteer.launch({
       args: chromium.args,
-      executablePath: await chromium.executablePath,
-      headless: chromium.headless,
+      executablePath: await chromium.executablePath || "/usr/bin/chromium-browser",
+      headless: true,
     });
 
     const page = await browser.newPage();
-    await page.goto("https://www.babycenter.com/pregnancy");
+    await page.goto("https://www.babycenter.com/pregnancy", { waitUntil: "domcontentloaded" });
 
-    // Example scraping logic (replace with what you need)
     const tips = await page.evaluate(() => {
       return Array.from(document.querySelectorAll("h2")).map((el) => el.innerText);
     });
