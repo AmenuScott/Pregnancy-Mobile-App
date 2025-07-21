@@ -4,7 +4,17 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, FlatList, Image, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  FlatList,
+  Image,
+  Linking,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 const HealthTips = () => {
   const [tips, setTips] = useState([]);
@@ -16,23 +26,31 @@ const HealthTips = () => {
     const fetchUserData = async () => {
       try {
         const userId = await AsyncStorage.getItem("userId");
+        if (!userId) throw new Error("User ID not found in storage");
+        
         const res = await fetch(`https://pregwell-backend.onrender.com/api/patients/${userId}`);
+        if (!res.ok) throw new Error("Failed to fetch user data");
+        
         const data = await res.json();
-        setUserName(data.first_name);
+        setUserName(data.first_name || "Mama");
       } catch (error) {
-        console.error("User fetch error:", error);
+        console.error("User fetch error:", error.message);
+        setUserName("Mama");
       }
     };
 
     const fetchTips = async () => {
       try {
-        const res = await fetch("https://pregwell-backend.onrender.com/api/Tips");
+        const res = await fetch("https://pregwell-backend.onrender.com/api/tips");
+        if (!res.ok) throw new Error("Failed to fetch tips");
+
         const data = await res.json();
-        setTips(data.tips);
+        setTips(data.tips || []);
       } catch (error) {
-        console.error("Tips fetch error:", error);
+        console.error("Tips fetch error:", error.message);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     fetchUserData();
@@ -60,13 +78,16 @@ const HealthTips = () => {
       {/* Tips List */}
       <FlatList
         data={tips}
-        keyExtractor={(item, index) => index.toString()}
+        keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={{ padding: 16 }}
         renderItem={({ item }) => (
           <View style={styles.card}>
             <Image source={{ uri: item.image }} style={styles.image} />
             <Text style={styles.title}>{item.title}</Text>
-            <TouchableOpacity style={styles.readMoreButton} onPress={() => router.push(item.link)}>
+            <TouchableOpacity
+              style={styles.readMoreButton}
+              onPress={() => Linking.openURL(item.link)}
+            >
               <Text style={styles.readMoreText}>Read More</Text>
             </TouchableOpacity>
           </View>

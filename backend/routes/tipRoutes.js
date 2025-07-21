@@ -1,8 +1,8 @@
+// routes/tipRoutes.js
 const express = require('express');
 const router = express.Router();
-const { getTipsByTrimester } = require('../controllers/tipController');
+const tipController = require('../controllers/tipController');
 
-// GET /api/tips
-router.get('/', getTipsByTrimester);
+router.get('/scrape', tipController.scrapeTips);
 
 module.exports = router;
