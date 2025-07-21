@@ -53,7 +53,7 @@ const ChatbotScreen = () => {
         ...prev,
         {
           id: (Date.now() + 1).toString(),
-          text: "⚠️ Could not connect to backend.",
+          text: "Could not connect to backend.",
           sender: "bot",
         },
       ]);
