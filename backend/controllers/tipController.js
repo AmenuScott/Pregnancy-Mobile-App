@@ -9,11 +9,13 @@ exports.scrapeTips = async (req, res) => {
 
     const $ = cheerio.load(html);
 
-    // Example: Scrape all headings inside article sections
     const tips = [];
 
-    $("article h2").each((i, el) => {
-      tips.push($(el).text().trim());
+    $(".card-title, .article-card__title, h2, h3").each((i, el) => {
+      const text = $(el).text().trim();
+      if (text && text.length > 10) {
+        tips.push(text);
+      }
     });
 
     res.json({ message: "Scraped tips using cheerio!", count: tips.length, tips });
@@ -22,6 +24,7 @@ exports.scrapeTips = async (req, res) => {
     res.status(500).json({ message: "Scraping failed", error: error.message });
   }
 };
+
 
 exports.getTips = async (req, res) => {
   try {
