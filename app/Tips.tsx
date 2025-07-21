@@ -2,10 +2,12 @@
 
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   FlatList,
   Image,
   Linking,
@@ -19,35 +21,30 @@ import {
 const HealthTips = () => {
   const [tips, setTips] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [userName, setUserName] = useState("");
+  const [userName, setUserName] = useState("Mama");
   const router = useRouter();
 
   useEffect(() => {
     const fetchUserData = async () => {
       try {
         const userId = await AsyncStorage.getItem("userId");
-        if (!userId) throw new Error("User ID not found in storage");
-        
+        if (!userId) throw new Error("User ID not found");
+
         const res = await fetch(`https://pregwell-backend.onrender.com/api/patients/${userId}`);
-        if (!res.ok) throw new Error("Failed to fetch user data");
-        
         const data = await res.json();
         setUserName(data.first_name || "Mama");
-      } catch (error) {
-        console.error("User fetch error:", error.message);
-        setUserName("Mama");
+      } catch (err) {
+        console.error("User fetch error:", err.message);
       }
     };
 
     const fetchTips = async () => {
       try {
         const res = await fetch("https://pregwell-backend.onrender.com/api/tips");
-        if (!res.ok) throw new Error("Failed to fetch tips");
-
         const data = await res.json();
         setTips(data.tips || []);
-      } catch (error) {
-        console.error("Tips fetch error:", error.message);
+      } catch (err) {
+        console.error("Tips fetch error:", err.message);
       } finally {
         setLoading(false);
       }
@@ -59,7 +56,7 @@ const HealthTips = () => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#A93E8B" />
       </SafeAreaView>
     );
@@ -67,13 +64,21 @@ const HealthTips = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
+      {/* Gradient Header */}
+      <LinearGradient
+        colors={["#C67EBF", "#A93E8B"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="white" />
+          <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerText}>Hi {userName}, here are your health tips 💡</Text>
-      </View>
+        <View style={{ flex: 1, paddingLeft: 10 }}>
+          <Text style={styles.greeting}>Hi {userName},</Text>
+          <Text style={styles.subtitle}>Here are your pregnancy health tips 💡</Text>
+        </View>
+      </LinearGradient>
 
       {/* Tips List */}
       <FlatList
@@ -81,7 +86,7 @@ const HealthTips = () => {
         keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={{ padding: 16 }}
         renderItem={({ item }) => (
-          <View style={styles.card}>
+          <Animated.View style={styles.card}>
             <Image source={{ uri: item.image }} style={styles.image} />
             <Text style={styles.title}>{item.title}</Text>
             <TouchableOpacity
@@ -90,7 +95,7 @@ const HealthTips = () => {
             >
               <Text style={styles.readMoreText}>Read More</Text>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
         )}
       />
     </SafeAreaView>
@@ -99,27 +104,42 @@ const HealthTips = () => {
 
 export default HealthTips;
 
+// 🌸 Styling with soft, clean PregWell look
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFF0F5", // soft pink
+    backgroundColor: "#FFF0F5", // Soft pink
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#FFF0F5",
   },
   header: {
-    backgroundColor: "#A93E8B", // PregWell purple
-    padding: 16,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 24,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
   },
-  headerText: {
+  greeting: {
     color: "white",
-    fontSize: 18,
-    fontWeight: "600",
-    flex: 1,
-    flexWrap: "wrap",
+    fontSize: 20,
+    fontWeight: "bold",
+  },
+  subtitle: {
+    color: "#FFE6F2",
+    fontSize: 14,
+    marginTop: 2,
   },
   card: {
-    backgroundColor: "white",
+    backgroundColor: "#fff",
     borderRadius: 20,
     marginBottom: 16,
     overflow: "hidden",
@@ -140,8 +160,8 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   readMoreButton: {
-    backgroundColor: "#FFB6C1", // light pink
-    padding: 10,
+    backgroundColor: "#FFDDEE",
+    padding: 12,
     alignItems: "center",
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
