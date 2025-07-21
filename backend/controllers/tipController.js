@@ -1,41 +1,46 @@
 // controllers/tipController.js
-const axios = require("axios");
-const cheerio = require("cheerio");
+const puppeteer = require("puppeteer");
 const pool = require("../db");
 
 exports.scrapeTips = async (req, res) => {
+  let browser;
   try {
-    const response = await axios.get("https://www.healthline.com/health/pregnancy");
-    const $ = cheerio.load(response.data);
+    browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
+    const page = await browser.newPage();
+    await page.goto("https://www.babycenter.com/pregnancy", { waitUntil: 'networkidle2' });
 
-    const tips = [];
+    // Wait for article cards to appear
+    await page.waitForSelector("article");
 
-    $("a.css-1m50asq").each((i, el) => {
-      const title = $(el).text().trim();
-      const link = $(el).attr("href");
+    const tips = await page.evaluate(() =>
+      Array.from(document.querySelectorAll("article")).map(el => {
+        const title = el.querySelector("h2, h3, h4")?.innerText?.trim() || "";
+        const linkEl = el.querySelector("a");
+        const link = linkEl ? linkEl.href : "";
+        const imgEl = el.querySelector("img");
+        const image = imgEl ? imgEl.src : null;
+        return (title && link) ? { title, link, image } : null;
+      }).filter(Boolean)
+    );
 
-      if (title && link) {
-        tips.push({
-          title,
-          link: link.startsWith("http") ? link : `https://www.healthline.com${link}`,
-          source: "Healthline",
-        });
-      }
-    });
-
+    let saved = 0;
     for (const tip of tips) {
       await pool.query(
-        `INSERT INTO tips (title, link, source, scraped_at)
-         VALUES ($1, $2, $3, NOW())
+        `INSERT INTO tips (title, link, image, source, scraped_at)
+         VALUES ($1, $2, $3, 'BabyCenter', NOW())
          ON CONFLICT DO NOTHING`,
-        [tip.title, tip.link, tip.source]
+        [tip.title, tip.link, tip.image]
       );
+      saved++;
     }
 
-    res.status(200).json({ message: "Scraped and saved tips!", count: tips.length });
-  } catch (error) {
-    console.error("Scrape error:", error.message);
-    res.status(500).json({ message: "Failed to scrape tips", error: error.message });
+    await browser.close();
+    res.status(200).json({ message: "Scraped and saved tips!", count: saved });
+
+  } catch (err) {
+    if (browser) await browser.close();
+    console.error("Scraping failed:", err.message);
+    res.status(500).json({ message: "Scraping failed", error: err.message });
   }
 };
 
@@ -45,8 +50,8 @@ exports.getTips = async (req, res) => {
       "SELECT * FROM tips ORDER BY scraped_at DESC NULLS LAST, created_at DESC"
     );
     res.json(result.rows);
-  } catch (error) {
-    console.error("Error fetching tips:", error.message);
-    res.status(500).json({ message: "Failed to fetch tips" });
+  } catch (err) {
+    console.error("Fetching tips failed:", err.message);
+    res.status(500).json({ message: "Failed to fetch tips", error: err.message });
   }
 };
