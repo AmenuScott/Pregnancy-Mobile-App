@@ -1,17 +1,20 @@
 // controllers/tipController.js
-const puppeteer = require("puppeteer");
 const pool = require("../db");
+const chromium = require("chrome-aws-lambda");
+const puppeteer = require("puppeteer-core");
 
 exports.scrapeTips = async (req, res) => {
   try {
     const browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-      executablePath: puppeteer.executablePath(), // ✅ use Puppeteer's own Chromium
+      args: chromium.args,
+      executablePath: await chromium.executablePath,
+      headless: chromium.headless,
     });
 
     const page = await browser.newPage();
-    await page.goto("https://www.babycenter.com/pregnancy");
+    await page.goto("https://www.babycenter.com/pregnancy", {
+      waitUntil: "domcontentloaded",
+    });
 
     const tips = await page.evaluate(() => {
       const elements = Array.from(document.querySelectorAll("a"));
