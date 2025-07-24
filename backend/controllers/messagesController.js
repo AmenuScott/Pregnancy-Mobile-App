@@ -47,7 +47,7 @@ exports.getConversation = async (req, res) => {
       .from("messages")
       .select("*")
       .or(
-        `and(sender_id.eq.${user1},reciever_id.eq.${user2}),and(sender_id.eq.${user2},reciever_id.eq.${user1})`
+  `and(sender_id.eq.${user1},receiver_id.eq.${user2}),and(sender_id.eq.${user2},receiver_id.eq.${user1})`
       )
       .order("created_at", { ascending: true });
 
