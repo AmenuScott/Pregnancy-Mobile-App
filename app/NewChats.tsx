@@ -35,19 +35,35 @@ export default function NewChatsScreen() {
         const token = await AsyncStorage.getItem("token")
         const userId = await AsyncStorage.getItem("userId")
 
+        console.log("🔍 Debug: Token exists:", !!token)
+        console.log("🔍 Debug: User ID:", userId)
+
         const response = await fetch("https://pregwell-backend.onrender.com/api/patients", {
           headers: { Authorization: `Bearer ${token}` },
         })
 
-        if (!response.ok) throw new Error("Failed to fetch users")
+        console.log("🔍 Debug: Response status:", response.status)
+        console.log("🔍 Debug: Response ok:", response.ok)
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.log("🔍 Debug: Error response:", errorText)
+          throw new Error(`Failed to fetch users: ${response.status} - ${errorText}`)
+        }
+        
         const data = await response.json()
+        console.log("🔍 Debug: Raw data received:", data)
+        console.log("🔍 Debug: Number of users:", data.length)
 
         // Exclude current user from contacts
-        setContacts(data.filter((u: { id: string | null }) => u.id !== userId))
+        const filteredData = data.filter((u: { id: string | null }) => u.id !== userId)
+        console.log("🔍 Debug: After filtering current user:", filteredData.length)
+        
+        setContacts(filteredData)
       } catch (err) {
         console.error("Fetch error:", err)
         setContacts([])
-        alert("Could not load users. Please check your connection and backend.")
+        alert(`Could not load users: ${err}`)
       }
       setLoading(false)
     }
