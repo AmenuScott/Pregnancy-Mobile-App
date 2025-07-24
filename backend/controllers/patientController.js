@@ -158,6 +158,7 @@ exports.getProfile = async (req, res) => {
   }
 };
 
+
 // GET ALL PATIENTS
 exports.getAllPatients = async (req, res) => {
   try {

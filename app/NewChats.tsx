@@ -3,45 +3,61 @@
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useRouter } from "expo-router"
 import { useEffect, useState } from "react"
-import { Image, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native"
+import {
+  Image,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from "react-native"
 
 export default function NewChatsScreen() {
-  const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState("");
+  const router = useRouter()
+  const [searchQuery, setSearchQuery] = useState("")
+
   type Contact = {
     id: string
     name: string
     avatar: string
     online: boolean
   }
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  const [contacts, setContacts] = useState<Contact[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchUsers = async () => {
-      setLoading(true);
+      setLoading(true)
       try {
-        const token = await AsyncStorage.getItem("token");
-        const userId = await AsyncStorage.getItem("userId");
+        const token = await AsyncStorage.getItem("token")
+        const userId = await AsyncStorage.getItem("userId")
+
         const response = await fetch("https://pregwell-backend.onrender.com/api/patients", {
           headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!response.ok) throw new Error("Failed to fetch users");
-        const data = await response.json();
-        setContacts(data.filter((u: { id: string | null }) => u.id !== userId));
+        })
+
+        if (!response.ok) throw new Error("Failed to fetch users")
+        const data = await response.json()
+
+        // Exclude current user from contacts
+        setContacts(data.filter((u: { id: string | null }) => u.id !== userId))
       } catch (err) {
-        // Show error message
-        setContacts([]);
-        alert("Could not load users. Please check your connection and backend.");
+        console.error("Fetch error:", err)
+        setContacts([])
+        alert("Could not load users. Please check your connection and backend.")
       }
-      setLoading(false);
-    };
-    fetchUsers();
-  }, []);
+      setLoading(false)
+    }
+
+    fetchUsers()
+  }, [])
 
   const filteredContacts = contacts.filter((c) =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  )
 
   return (
     <View style={styles.container}>
@@ -80,12 +96,20 @@ export default function NewChatsScreen() {
               style={styles.contactCard}
               onPress={() =>
                 router.push({
-                  pathname: "/Chats",
-                  params: { receiverId: contact.id, receiverName: contact.name },
+                  pathname: "/ChatScreen/[id]",
+                  params: {
+                    id: contact.id,
+                    receiverName: contact.name,
+                  },
                 })
               }
             >
-              <Image source={{ uri: contact.avatar }} style={styles.avatar} />
+              <Image
+source={{
+    uri: contact.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(contact.name)}`,
+  }}
+  style={styles.avatar}
+/>
               <View style={styles.contactInfo}>
                 <Text style={styles.contactName}>{contact.name}</Text>
                 <View style={styles.statusRow}>
@@ -108,7 +132,7 @@ export default function NewChatsScreen() {
         )}
       </ScrollView>
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -139,7 +163,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 20,
     fontWeight: "bold",
-    color: "#222", // black heading
+    color: "#222",
     textAlign: "center",
   },
   searchBar: {

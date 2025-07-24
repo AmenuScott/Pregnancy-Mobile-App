@@ -1,138 +1,176 @@
-import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useState } from "react";
-import { FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useLocalSearchParams } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { setupNotification, showLocalNotification } from "../utils/notify";
+import socket from "../utils/socket";
 
-const ChatScreen = () => {
-  const { id } = useLocalSearchParams();
-  const router = useRouter();
-  const [messages, setMessages] = useState([
-    { id: 1, sender: "other", text: "Hi there!" },
-    { id: 2, sender: "me", text: "Hello! How are you?" },
-    { id: 3, sender: "other", text: "Doing well, thanks!" },
-  ]);
-  const [input, setInput] = useState("");
+export default function ChatScreen() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [text, setText] = useState("");
+  const flatListRef = useRef<FlatList>(null);
 
-  const sendMessage = () => {
-    if (!input.trim()) return;
-    const newMessage = {
-      id: messages.length + 1,
-      sender: "me",
-      text: input,
+  const { id: receiverId } = useLocalSearchParams(); // receiver's ID from route
+  const [senderId, setSenderId] = useState<string | null>(null);
+
+  type Message = {
+    id: number;
+    sender_id: string;
+    receiver_id: string;
+    content: string;
+    timestamp?: string;
+  };
+
+  // 🧠 Setup notifications on mount
+  useEffect(() => {
+    setupNotification(); // ✅ Ask for notification permissions
+  }, []);
+
+  // 🔐 Get sender ID and join socket room
+  useEffect(() => {
+    (async () => {
+      const id = await AsyncStorage.getItem("userId");
+      setSenderId(id);
+      socket.emit("join", id); // join user's own room
+    })();
+  }, []);
+
+  // 🔁 Fetch old messages from backend
+  useEffect(() => {
+    if (senderId && receiverId) {
+      fetch(`https://pregwell-backend.onrender.com/api/messages/thread/${senderId}/${receiverId}`)
+        .then((res) => res.json())
+        .then((data) => setMessages(data))
+        .catch((err) => console.error("❌ Fetch error:", err));
+    }
+  }, [senderId, receiverId]);
+
+  // 📥 Listen for real-time new messages
+  useEffect(() => {
+    socket.on("receive_message", (msg) => {
+      if (
+        (msg.sender_id === senderId && msg.receiver_id === receiverId) ||
+        (msg.sender_id === receiverId && msg.receiver_id === senderId)
+      ) {
+        setMessages((prev) => [...prev, msg]);
+      } else {
+        showLocalNotification("📩 New Message", "You received a new message");
+      }
+    });
+
+    return () => {
+      socket.off("receive_message");
     };
-    setMessages([...messages, newMessage]);
-    setInput("");
+  }, [senderId, receiverId]);
+
+  // 📨 Send message
+  const handleSend = () => {
+    if (!text.trim() || !senderId || !receiverId) return;
+
+    const message = {
+      sender_id: senderId,
+      receiver_id: receiverId,
+      content: text.trim(),
+    };
+
+    socket.emit("send_message", message); // send via socket
+    setMessages((prev) => [...prev, { ...message, id: Date.now() }]); // temp ID
+    setText(""); // clear input
+    flatListRef.current?.scrollToEnd({ animated: true });
+  };
+
+  // 💬 Render each message
+  const renderItem = ({ item }: { item: Message }) => {
+    const isSender = item.sender_id === senderId;
+    return (
+      <View style={[styles.message, isSender ? styles.sender : styles.receiver]}>
+        <Text style={styles.messageText}>{item.content}</Text>
+      </View>
+    );
   };
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
       style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={90}
     >
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerText}>Chat #{id}</Text>
-      </View>
-
       <FlatList
+        ref={flatListRef}
         data={messages}
+        renderItem={renderItem}
         keyExtractor={(item) => item.id.toString()}
-        style={styles.messagesList}
-        contentContainerStyle={{ paddingVertical: 10 }}
-        renderItem={({ item }) => (
-          <View
-            style={[
-              styles.messageBubble,
-              item.sender === "me" ? styles.myMessage : styles.otherMessage,
-            ]}
-          >
-            <Text style={styles.messageText}>{item.text}</Text>
-          </View>
-        )}
+        contentContainerStyle={{ padding: 10 }}
+        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
       />
 
+      {/* Input field and send button */}
       <View style={styles.inputContainer}>
         <TextInput
-          placeholder="Type your message..."
           style={styles.input}
-          value={input}
-          onChangeText={setInput}
+          placeholder="Type message..."
+          value={text}
+          onChangeText={setText}
         />
-        <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
-          <Ionicons name="send" size={20} color="#fff" />
+        <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
+          <Text style={{ color: "#fff", fontWeight: "bold" }}>Send</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
-};
-
-export default ChatScreen;
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFF",
+    backgroundColor: "#fff",
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#B83280",
-    paddingTop: 50,
-    paddingBottom: 15,
-    paddingHorizontal: 20,
-  },
-  headerText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
-    marginLeft: 10,
-  },
-  messagesList: {
-    flex: 1,
-    paddingHorizontal: 10,
-  },
-  messageBubble: {
+  message: {
     maxWidth: "75%",
-    borderRadius: 20,
     padding: 10,
-    marginVertical: 5,
+    borderRadius: 14,
+    marginVertical: 6,
   },
-  myMessage: {
-    backgroundColor: "#FDC5F5",
+  sender: {
     alignSelf: "flex-end",
-    borderBottomRightRadius: 5,
+    backgroundColor: "#9C27B0",
   },
-  otherMessage: {
-    backgroundColor: "#E6E6E6",
+  receiver: {
     alignSelf: "flex-start",
-    borderBottomLeftRadius: 5,
+    backgroundColor: "#E1BEE7",
   },
   messageText: {
-    fontSize: 15,
-    color: "#333",
+    color: "#fff",
   },
   inputContainer: {
     flexDirection: "row",
-    alignItems: "center",
-    padding: 10,
+    padding: 12,
     borderTopWidth: 1,
-    borderColor: "#ddd",
-    backgroundColor: "#fff",
+    borderTopColor: "#eee",
+    backgroundColor: "#fafafa",
   },
   input: {
     flex: 1,
-    borderRadius: 20,
-    borderColor: "#ccc",
-    borderWidth: 1,
-    paddingVertical: 8,
+    backgroundColor: "#f1f1f1",
     paddingHorizontal: 15,
-    marginRight: 10,
+    paddingVertical: 10,
+    borderRadius: 20,
+    fontSize: 16,
   },
   sendButton: {
-    backgroundColor: "#B83280",
-    padding: 10,
-    borderRadius: 50,
+    marginLeft: 10,
+    backgroundColor: "#9C27B0",
+    paddingHorizontal: 18,
+    justifyContent: "center",
+    borderRadius: 20,
   },
 });

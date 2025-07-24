@@ -22,4 +22,7 @@ router.get('/profile/:userId', patientController.getProfile);
 // backend/routes/usersRoutes.js
 router.get("/patients", patientController.getAllPatients);
 
+router.get("/", patientController.getAllPatients);
+
+
 module.exports = router;

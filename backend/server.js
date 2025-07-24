@@ -3,7 +3,10 @@ const cors = require("cors");
 require("dotenv").config();
 const http = require("http");
 const { Server } = require("socket.io");
-const pool = require("./db"); // pg Pool configured with Supabase DATABASE_URL
+const { createClient } = require("@supabase/supabase-js");
+
+// Supabase client
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
 // Routes
 const userRoutes = require("./routes/userRoutes");
@@ -16,15 +19,13 @@ const emergencyRoutes = require("./routes/emergencyRoutes");
 const messageRoutes = require("./routes/messagesRoutes");
 const healthRoutes = require("./routes/healthRoutes");
 
-
-
-
 const app = express();
 const server = http.createServer(app);
 
+// Socket.IO setup
 const io = new Server(server, {
   cors: {
-    origin: "*", // Allow frontend to connect (React Native)
+    origin: "*", // Allow frontend connection (e.g. Expo app)
   },
 });
 
@@ -39,52 +40,52 @@ app.use("/api/users", userRoutes);
 app.use("/api/patients", patientRoutes);
 app.use("/api/setup", setupRoutes);
 app.use("/api/notifications", notificationRoutes);
-app.use('/api/tips', tipRoutes);
+app.use("/api/tips", tipRoutes);
 app.use("/api/exercises", exerciseRoutes);
 app.use("/api/emergency", emergencyRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/health", healthRoutes);
-
 
 // Base route
 app.get("/", (req, res) => {
   res.send("🚀 PregCare API is up and running!");
 });
 
-// ✅ Database test route
+// Optional: test Supabase DB connection
 app.get("/health", async (req, res) => {
-  try {
-    const result = await pool.query("SELECT NOW()");
-    res.json({ dbTime: result.rows[0].now });
-  } catch (err) {
-    console.error("❌ DB test error:", err.message);
-    res.status(500).json({ error: "Database not connected", details: err.message });
+  const { data, error } = await supabase.rpc("now");
+  if (error) {
+    console.error("❌ Supabase error:", error.message);
+    return res.status(500).json({ error: "Supabase not connected", details: error.message });
   }
+  res.json({ dbTime: data });
 });
 
-// ⚡ SOCKET.IO Real-time chat
+// ✅ SOCKET.IO Real-time messaging logic
 io.on("connection", (socket) => {
   console.log("✅ User connected:", socket.id);
 
   socket.on("join", (userId) => {
     socket.join(userId.toString());
-    console.log(`👥 User ${userId} joined their room`);
+    console.log(`👥 User ${userId} joined room`);
   });
 
   socket.on("send_message", async (data) => {
     const { sender_id, receiver_id, content } = data;
 
     try {
-      const result = await pool.query(
-        "INSERT INTO messages (sender_id, receiver_id, content) VALUES ($1, $2, $3) RETURNING *",
-        [sender_id, receiver_id, content]
-      );
+      const { data: savedMessage, error } = await supabase
+        .from("messages")
+        .insert([{ sender_id, receiver_id, content }])
+        .select()
+        .single();
 
-      const savedMessage = result.rows[0];
+      if (error) throw error;
+
       io.to(receiver_id.toString()).emit("receive_message", savedMessage);
-      console.log(`📩 Sent message from ${sender_id} to ${receiver_id}`);
+      console.log(`📨 Message sent from ${sender_id} to ${receiver_id}`);
     } catch (err) {
-      console.error("❌ Message save error:", err);
+      console.error("❌ Supabase message error:", err.message);
     }
   });
 
