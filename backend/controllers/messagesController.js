@@ -1,10 +1,9 @@
 const { createClient } = require('@supabase/supabase-js');
 const pool = require("../db");
-const express = require("express");
-
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
+// SEND MESSAGE
 exports.sendMessage = async (req, res) => {
   const { sender_id, receiver_id, content } = req.body;
 
@@ -24,6 +23,7 @@ exports.sendMessage = async (req, res) => {
   res.json(data[0]);
 };
 
+// MESSAGE THREAD
 exports.getMessageThread = async (req, res) => {
   const { senderId, receiverId } = req.params;
 
@@ -41,7 +41,7 @@ exports.getMessageThread = async (req, res) => {
   res.json(data);
 };
 
-// GET /api/messages/thread/:user1/:user2
+// CONVERSATION BETWEEN 2 USERS
 exports.getConversation = async (req, res) => {
   const { user1, user2 } = req.params;
 
@@ -49,9 +49,7 @@ exports.getConversation = async (req, res) => {
     const { data, error } = await supabase
       .from("messages")
       .select("*")
-      .or(
-  `and(sender_id.eq.${user1},receiver_id.eq.${user2}),and(sender_id.eq.${user2},receiver_id.eq.${user1})`
-      )
+      .or(`and(sender_id.eq.${user1},receiver_id.eq.${user2}),and(sender_id.eq.${user2},receiver_id.eq.${user1})`)
       .order("created_at", { ascending: true });
 
     if (error) throw error;
@@ -63,6 +61,7 @@ exports.getConversation = async (req, res) => {
   }
 };
 
+// GET UNIQUE CHAT PARTNERS
 exports.getChatPartners = async (req, res) => {
   const { userId } = req.params;
 
@@ -77,15 +76,15 @@ exports.getChatPartners = async (req, res) => {
     const chatUserIds = new Set();
 
     data.forEach(msg => {
-      if (msg.sender_id !== parseInt(userId)) chatUserIds.add(msg.sender_id);
-      if (msg.receiver_id !== parseInt(userId)) chatUserIds.add(msg.receiver_id);
+      if (msg.sender_id !== userId) chatUserIds.add(msg.sender_id);
+      if (msg.receiver_id !== userId) chatUserIds.add(msg.receiver_id);
     });
 
     const ids = [...chatUserIds];
 
     const { data: users, error: userError } = await supabase
       .from("patients")
-      .select("id, first_name, last_name,")
+      .select("id, first_name, last_name")
       .in("id", ids);
 
     if (userError) throw userError;
@@ -102,6 +101,7 @@ exports.getChatPartners = async (req, res) => {
   }
 };
 
+// INBOX: USERS YOU HAVE CHATTED WITH
 exports.getInbox = async (req, res) => {
   const { userId } = req.params;
 
@@ -140,5 +140,3 @@ exports.getInbox = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch chat partners" });
   }
 };
-
-
