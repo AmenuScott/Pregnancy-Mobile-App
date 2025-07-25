@@ -1,4 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
+const pool = require("../db");
+const express = require("express");
+
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -100,4 +103,45 @@ exports.getChatPartners = async (req, res) => {
   }
 };
 
+exports.getInbox = async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const { data, error } = await supabase
+      .from("messages")
+      .select("sender_id, receiver_id, content, created_at")
+      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    // Extract unique user IDs from messages
+    const chatPartners = new Set();
+    data.forEach((msg) => {
+      if (msg.sender_id !== userId) chatPartners.add(msg.sender_id);
+      if (msg.receiver_id !== userId) chatPartners.add(msg.receiver_id);
+    });
+
+    const idsArray = Array.from(chatPartners);
+
+    // Fetch user details for those IDs
+    const result = await pool.query(
+      `SELECT id, first_name, last_name, profile_picture 
+       FROM patients 
+       WHERE id = ANY($1::uuid[])`,
+      [idsArray]
+    );
+
+    const users = result.rows.map((u) => ({
+      id: u.id,
+      name: `${u.first_name} ${u.last_name}`,
+      avatar: u.profile_picture || null,
+    }));
+
+    res.json(users);
+  } catch (err) {
+    console.error("❌ Error fetching inbox:", err.message);
+    res.status(500).json({ error: "Failed to fetch chat partners" });
+  }
+};
 
