@@ -67,24 +67,31 @@ const MessagesScreen = () => {
 
   const filteredMessages = messages.filter((msg) => msg.name.toLowerCase().includes(search.toLowerCase()))
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60)
+  const formatTime = (dateString: string): string => {
+    try {
+      const date = new Date(dateString)
+      const now = new Date()
+      const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60)
 
-    if (diffInHours < 24) {
-      return date.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    } else if (diffInHours < 168) {
-      // Less than a week
-      return date.toLocaleDateString([], { weekday: "short" })
-    } else {
-      return date.toLocaleDateString([], {
-        month: "short",
-        day: "numeric",
-      })
+      if (diffInHours < 24) {
+        return (
+          date.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }) || ""
+        )
+      } else if (diffInHours < 168) {
+        return date.toLocaleDateString([], { weekday: "short" }) || ""
+      } else {
+        return (
+          date.toLocaleDateString([], {
+            month: "short",
+            day: "numeric",
+          }) || ""
+        )
+      }
+    } catch (error) {
+      return ""
     }
   }
 
@@ -129,7 +136,9 @@ const MessagesScreen = () => {
           </Text>
           {item.unreadCount && item.unreadCount > 0 && (
             <View style={styles.unreadBadge}>
-              <Text style={styles.unreadText}>{item.unreadCount > 99 ? "99+" : item.unreadCount}</Text>
+              <Text style={styles.unreadText}>
+                {item.unreadCount && item.unreadCount > 99 ? "99+" : String(item.unreadCount || 0)}
+              </Text>
             </View>
           )}
         </View>
@@ -164,7 +173,7 @@ const MessagesScreen = () => {
           <View style={styles.headerCenter}>
             <Text style={styles.headerTitle}>Messages</Text>
             <Text style={styles.headerSubtitle}>
-              {messages.length} conversation{messages.length !== 1 ? "s" : ""}
+              {`${messages.length || 0} conversation${messages.length !== 1 ? "s" : ""}`}
             </Text>
           </View>
 
