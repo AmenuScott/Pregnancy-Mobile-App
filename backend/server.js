@@ -37,7 +37,7 @@ app.use(express.json());
 
 // Routes
 app.use("/api/users", userRoutes);
-app.use("/api/patients", patientRoutes);
+app.use("/api/", patientRoutes);
 app.use("/api/setup", setupRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/tips", tipRoutes);
