@@ -8,16 +8,16 @@ import { LinearGradient } from "expo-linear-gradient"
 import { useRouter } from "expo-router"
 import { useEffect, useRef, useState } from "react"
 import {
-    Animated,
-    Dimensions,
-    Image,
-    Platform,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Animated,
+  Dimensions,
+  Image,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native"
 
 const { width, height } = Dimensions.get("window")
@@ -99,7 +99,7 @@ const ProfileScreen = () => {
         const userId = await AsyncStorage.getItem("userId")
         if (!token || !userId) return
 
-        const response = await fetch(`https://pregwell-backend.onrender.com/api/patients/profile/${userId}`, {
+        const response = await fetch(`https://pregwell-backend.onrender.com/api/profile/${userId}`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (!response.ok) return

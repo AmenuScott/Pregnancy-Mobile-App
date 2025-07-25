@@ -39,7 +39,7 @@ const HealthTips = () => {
       try {
         const userId = await AsyncStorage.getItem("userId")
         if (!userId) throw new Error("User ID not found")
-        const res = await fetch(`https://pregwell-backend.onrender.com/api/patients/${userId}`)
+        const res = await fetch(`https://pregwell-backend.onrender.com/api/${userId}`)
         const data = await res.json()
         setUserName(data.first_name || "Mama")
       } catch (err) {
