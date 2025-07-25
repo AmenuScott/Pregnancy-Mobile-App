@@ -432,7 +432,7 @@ const HomeScreen = () => {
               subtitle: "Connect with others",
               icon: "chatbubbles-outline",
               colors: ["#FFF3E0", "#FFFAF0"],
-              onPress: () => router.push("/Chats"),
+              onPress: () => router.push("/Messages"),
             },
           ]}
         />
