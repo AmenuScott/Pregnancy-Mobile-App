@@ -85,7 +85,7 @@ exports.getChatPartners = async (req, res) => {
 
     const { data: users, error: userError } = await supabase
       .from("patients")
-      .select("id, first_name, last_name, profile_picture")
+      .select("id, first_name, last_name,")
       .in("id", ids);
 
     if (userError) throw userError;
@@ -93,7 +93,6 @@ exports.getChatPartners = async (req, res) => {
     const formattedUsers = users.map(user => ({
       id: user.id,
       name: `${user.first_name} ${user.last_name}`,
-      avatar: user.profile_picture || null,
     }));
 
     res.json(formattedUsers);
