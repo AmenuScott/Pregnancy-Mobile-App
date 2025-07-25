@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// SIGNUP
+// ✅ REGISTER USER
 exports.registeruser = async (req, res) => {
   const { first_name, last_name, email, password, dob } = req.body;
 
@@ -48,7 +48,7 @@ exports.registeruser = async (req, res) => {
   }
 };
 
-// LOGIN
+// ✅ LOGIN USER
 exports.loginUser = async (req, res) => {
   const { email, password } = req.body;
 
@@ -73,8 +73,6 @@ exports.loginUser = async (req, res) => {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
-    const profileCompleted = user.profile_completed;
-
     const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, {
       expiresIn: '7d',
     });
@@ -84,17 +82,17 @@ exports.loginUser = async (req, res) => {
     res.status(200).json({
       user: {
         ...userWithoutPassword,
-        profileCompleted,
+        profileCompleted: user.profile_completed,
       },
       token,
     });
   } catch (err) {
     console.error('❌ Login error:', err);
-    res.status(401).json({ message: "Invalid credentials" });
+    res.status(500).json({ message: "Server error during login" });
   }
 };
 
-// COMPLETE SETUP
+// ✅ COMPLETE PROFILE SETUP
 exports.completeSetup = async (req, res) => {
   const { userId } = req.params;
   const {
@@ -102,7 +100,7 @@ exports.completeSetup = async (req, res) => {
     firstPregnancy
   } = req.body;
 
-  if (!userId || !lastMenstrualPeriod || firstPregnancy === undefined) {
+  if (!userId || !lastMenstrualPeriod || typeof firstPregnancy === "undefined") {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
@@ -125,11 +123,11 @@ exports.completeSetup = async (req, res) => {
     res.status(200).json({ message: 'Setup completed successfully' });
   } catch (error) {
     console.error('❌ Error saving setup:', error);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error during setup' });
   }
 };
 
-// GET PROFILE
+// ✅ GET PATIENT PROFILE
 exports.getProfile = async (req, res) => {
   const { userId } = req.params;
 
@@ -153,26 +151,26 @@ exports.getProfile = async (req, res) => {
 
     res.status(200).json(result.rows[0]);
   } catch (error) {
-    console.error('Get profile error:', error);
+    console.error('❌ Get profile error:', error);
     res.status(500).json({ error: 'Server error during profile fetch' });
   }
 };
 
-
-// GET ALL PATIENTS
+// ✅ GET ALL USERS FOR NEW CHAT SCREEN
 exports.getAllPatients = async (req, res) => {
   try {
     const patients = await pool.query(
-      'SELECT id, first_name, last_name, email, profile_picture FROM patients'
+      'SELECT id, first_name, last_name FROM patients'
     );
 
-    const users = patients.rows.map(p => ({
-      id: p.id,
-      name: `${p.first_name} ${p.last_name}`,
-      avatar: p.profile_picture || null,
-      email: p.email,
-      online: true
-    }));
+    const users = patients.rows
+      .map(p => ({
+        id: p.id,
+        name: `${p.first_name} ${p.last_name}`,
+        avatar: null, // fallback to initials in frontend
+        online: true
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name)); // sort alphabetically
 
     res.json(users);
   } catch (err) {

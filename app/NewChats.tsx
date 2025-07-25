@@ -21,7 +21,7 @@ export default function NewChatsScreen() {
   type Contact = {
     id: string
     name: string
-    avatar: string
+    avatar: string | null
     online: boolean
   }
 
@@ -58,6 +58,15 @@ export default function NewChatsScreen() {
   const filteredContacts = contacts.filter((c) =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
+
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((word) => word[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2)
+  }
 
   return (
     <View style={styles.container}>
@@ -104,12 +113,17 @@ export default function NewChatsScreen() {
                 })
               }
             >
-              <Image
-source={{
-    uri: contact.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(contact.name)}`,
-  }}
-  style={styles.avatar}
-/>
+              {contact.avatar ? (
+                <Image
+                  source={{ uri: contact.avatar }}
+                  style={styles.avatar}
+                />
+              ) : (
+                <View style={styles.initialsCircle}>
+                  <Text style={styles.initialsText}>{getInitials(contact.name)}</Text>
+                </View>
+              )}
+
               <View style={styles.contactInfo}>
                 <Text style={styles.contactName}>{contact.name}</Text>
                 <View style={styles.statusRow}>
@@ -124,6 +138,7 @@ source={{
                   </Text>
                 </View>
               </View>
+
               <View style={styles.messageButton}>
                 <Text style={styles.messageButtonText}>Chat</Text>
               </View>
@@ -199,6 +214,22 @@ const styles = StyleSheet.create({
     marginRight: 14,
     borderWidth: 2,
     borderColor: "#E1BEE7",
+  },
+  initialsCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "#CE93D8",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 14,
+    borderWidth: 2,
+    borderColor: "#E1BEE7",
+  },
+  initialsText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
   },
   contactInfo: {
     flex: 1,
