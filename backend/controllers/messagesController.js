@@ -3,7 +3,7 @@ const pool = require("../db");
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-// SEND MESSAGE
+// ✅ SEND MESSAGE
 exports.sendMessage = async (req, res) => {
   const { sender_id, receiver_id, content } = req.body;
 
@@ -13,17 +13,36 @@ exports.sendMessage = async (req, res) => {
 
   const { data, error } = await supabase
     .from('messages')
-    .insert([{ sender_id, receiver_id, content }]);
+    .insert([{ sender_id, receiver_id, content, is_read: false }]);
 
   if (error) {
-    console.error("Supabase error:", error);
+    console.error("❌ Supabase error:", error);
     return res.status(500).json({ error: "Failed to send message" });
   }
 
   res.json(data[0]);
 };
 
-// MESSAGE THREAD
+// ✅ MARK MESSAGES AS READ
+exports.markMessagesAsRead = async (req, res) => {
+  const { senderId, receiverId } = req.params;
+
+  try {
+    const { error } = await supabase
+      .from("messages")
+      .update({ is_read: true })
+      .match({ sender_id: senderId, receiver_id: receiverId, is_read: false });
+
+    if (error) throw error;
+
+    res.json({ message: "Messages marked as read" });
+  } catch (err) {
+    console.error("❌ Error updating messages:", err.message);
+    res.status(500).json({ error: "Failed to mark messages as read" });
+  }
+};
+
+// ✅ FETCH MESSAGE THREAD BETWEEN 2 USERS
 exports.getMessageThread = async (req, res) => {
   const { senderId, receiverId } = req.params;
 
@@ -34,14 +53,14 @@ exports.getMessageThread = async (req, res) => {
     .order('created_at', { ascending: true });
 
   if (error) {
-    console.error("Supabase error:", error);
+    console.error("❌ Supabase error:", error);
     return res.status(500).json({ error: "Failed to fetch thread" });
   }
 
   res.json(data);
 };
 
-// CONVERSATION BETWEEN 2 USERS
+// ✅ CONVERSATION ALIAS (similar to thread)
 exports.getConversation = async (req, res) => {
   const { user1, user2 } = req.params;
 
@@ -56,12 +75,12 @@ exports.getConversation = async (req, res) => {
 
     res.json(data);
   } catch (err) {
-    console.error("❌ Error fetching thread:", err.message);
+    console.error("❌ Error fetching conversation:", err.message);
     res.status(500).json({ error: "Failed to fetch messages" });
   }
 };
 
-// GET UNIQUE CHAT PARTNERS
+// ✅ GET CHAT PARTNERS (basic list of users you've messaged)
 exports.getChatPartners = async (req, res) => {
   const { userId } = req.params;
 
@@ -101,43 +120,59 @@ exports.getChatPartners = async (req, res) => {
   }
 };
 
-// INBOX: USERS YOU HAVE CHATTED WITH
+// ✅ GET INBOX WITH UNREAD COUNTS + LAST MESSAGE
 exports.getInbox = async (req, res) => {
   const { userId } = req.params;
 
   try {
-    const { data, error } = await supabase
+    const { data: messages, error } = await supabase
       .from("messages")
-      .select("sender_id, receiver_id, content, created_at")
+      .select("sender_id, receiver_id, content, created_at, is_read")
       .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
       .order("created_at", { ascending: false });
 
     if (error) throw error;
 
-    const chatPartners = new Set();
-    data.forEach((msg) => {
-      if (msg.sender_id !== userId) chatPartners.add(msg.sender_id);
-      if (msg.receiver_id !== userId) chatPartners.add(msg.receiver_id);
+    const chatPartners = new Map();
+
+    messages.forEach((msg) => {
+      const partnerId = msg.sender_id === userId ? msg.receiver_id : msg.sender_id;
+      const isFromPartner = msg.sender_id !== userId;
+
+      if (!chatPartners.has(partnerId)) {
+        chatPartners.set(partnerId, {
+          lastMessage: msg.content,
+          created_at: msg.created_at,
+          unreadCount: 0,
+        });
+      }
+
+      if (isFromPartner && !msg.is_read) {
+        chatPartners.get(partnerId).unreadCount += 1;
+      }
     });
 
-    const idsArray = Array.from(chatPartners);
+    const idsArray = Array.from(chatPartners.keys());
 
     const result = await pool.query(
-      `SELECT id, first_name, last_name 
-       FROM patients 
-       WHERE id = ANY($1::uuid[])`,
+      `SELECT id, first_name, last_name FROM patients WHERE id = ANY($1::uuid[])`,
       [idsArray]
     );
 
-    const users = result.rows.map((u) => ({
-      id: u.id,
-      name: `${u.first_name} ${u.last_name}`,
-    }));
+    const users = result.rows.map((u) => {
+      const info = chatPartners.get(u.id);
+      return {
+        id: u.id,
+        name: `${u.first_name} ${u.last_name}`,
+        content: info.lastMessage,
+        created_at: info.created_at,
+        unreadCount: info.unreadCount,
+      };
+    });
 
     res.json(users);
   } catch (err) {
-    console.error("❌ Error fetching chat partners:", err.message);
-    res.status(500).json({ error: "Failed to fetch chat partners" });
+    console.error("❌ Error fetching inbox:", err.message);
+    res.status(500).json({ error: "Failed to fetch inbox" });
   }
 };
-

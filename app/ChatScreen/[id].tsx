@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   FlatList,
@@ -15,12 +15,15 @@ import { setupNotification, showLocalNotification } from "../utils/notify";
 import socket from "../utils/socket";
 
 export default function ChatScreen() {
+  const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
   const flatListRef = useRef<FlatList>(null);
 
-  const { id: receiverId } = useLocalSearchParams(); // receiver's ID from route
+  const { id: receiverId, receiverName } = useLocalSearchParams();
   const [senderId, setSenderId] = useState<string | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
+
 
   type Message = {
     id: number;
@@ -30,37 +33,40 @@ export default function ChatScreen() {
     timestamp?: string;
   };
 
-  // 🧠 Setup notifications on mount
+  // 🧠 Setup notifications
   useEffect(() => {
-    setupNotification(); // ✅ Ask for notification permissions
+    setupNotification();
   }, []);
 
-  // 🔐 Get sender ID and join socket room
+  // 🔐 Get sender ID
   useEffect(() => {
     (async () => {
       const id = await AsyncStorage.getItem("userId");
       setSenderId(id);
-      socket.emit("join", id); // join user's own room
+      socket.emit("join", id);
     })();
   }, []);
 
-  // 🔁 Fetch old messages from backend
+  // 🔁 Load message history
   useEffect(() => {
     if (senderId && receiverId) {
-      fetch(`https://pregwell-backend.onrender.com/api/messages/thread/${senderId}/${receiverId}`)
+      fetch(
+        `https://pregwell-backend.onrender.com/api/messages/thread/${senderId}/${receiverId}`
+      )
         .then((res) => res.json())
         .then((data) => setMessages(data))
         .catch((err) => console.error("❌ Fetch error:", err));
     }
   }, [senderId, receiverId]);
 
-  // 📥 Listen for real-time new messages
+  // 📥 Receive messages
   useEffect(() => {
     socket.on("receive_message", (msg) => {
-      if (
+      const isMatch =
         (msg.sender_id === senderId && msg.receiver_id === receiverId) ||
-        (msg.sender_id === receiverId && msg.receiver_id === senderId)
-      ) {
+        (msg.sender_id === receiverId && msg.receiver_id === senderId);
+
+      if (isMatch) {
         setMessages((prev) => [...prev, msg]);
       } else {
         showLocalNotification("📩 New Message", "You received a new message");
@@ -72,7 +78,38 @@ export default function ChatScreen() {
     };
   }, [senderId, receiverId]);
 
-  // 📨 Send message
+  useEffect(() => {
+  if (!senderId || !receiverId) return;
+
+  if (text.trim()) {
+    socket.emit("typing", { senderId, receiverId });
+  } else {
+    socket.emit("stop_typing", { senderId, receiverId });
+  }
+}, [text]);
+
+
+useEffect(() => {
+  socket.on("typing", ({ senderId: typingUserId, receiverId: to }) => {
+    if (to === senderId && typingUserId === receiverId) {
+      setIsTyping(true);
+    }
+  });
+
+  socket.on("stop_typing", ({ senderId: typingUserId, receiverId: to }) => {
+    if (to === senderId && typingUserId === receiverId) {
+      setIsTyping(false);
+    }
+  });
+
+  return () => {
+    socket.off("typing");
+    socket.off("stop_typing");
+  };
+}, [senderId, receiverId]);
+
+
+  // 📨 Send
   const handleSend = () => {
     if (!text.trim() || !senderId || !receiverId) return;
 
@@ -82,17 +119,19 @@ export default function ChatScreen() {
       content: text.trim(),
     };
 
-    socket.emit("send_message", message); // send via socket
-    setMessages((prev) => [...prev, { ...message, id: Date.now() }]); // temp ID
-    setText(""); // clear input
+    socket.emit("send_message", message);
+    setMessages((prev) => [...prev, { ...message, id: Date.now() }]);
+    setText("");
     flatListRef.current?.scrollToEnd({ animated: true });
   };
 
-  // 💬 Render each message
+  // 💬 Render message
   const renderItem = ({ item }: { item: Message }) => {
     const isSender = item.sender_id === senderId;
     return (
-      <View style={[styles.message, isSender ? styles.sender : styles.receiver]}>
+      <View
+        style={[styles.message, isSender ? styles.sender : styles.receiver]}
+      >
         <Text style={styles.messageText}>{item.content}</Text>
       </View>
     );
@@ -104,16 +143,50 @@ export default function ChatScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={90}
     >
+      {/* 🧭 HEADER */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={styles.backButton}>←</Text>
+        </TouchableOpacity>
+
+        <View style={styles.userInfo}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>
+              {receiverName
+                ?.split(" ")
+                .map((n) => n[0])
+                .join("")
+                .toUpperCase()}
+            </Text>
+          </View>
+          <Text style={styles.name}>{receiverName}</Text>
+        </View>
+
+        <View style={styles.onlineDot} />
+      </View>
+
+      {/* 💬 Messages */}
       <FlatList
         ref={flatListRef}
         data={messages}
         renderItem={renderItem}
         keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={{ padding: 10 }}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+        onContentSizeChange={() =>
+          flatListRef.current?.scrollToEnd({ animated: true })
+        }
       />
 
-      {/* Input field and send button */}
+      {isTyping && (
+  <View style={{ paddingHorizontal: 14, marginBottom: 6 }}>
+    <Text style={{ color: "#888", fontStyle: "italic" }}>
+      {receiverName} is typing...
+    </Text>
+  </View>
+)}
+
+
+      {/* 📝 Input */}
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
@@ -133,6 +206,47 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 12,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  backButton: {
+    fontSize: 24,
+    color: "#9C27B0",
+  },
+  userInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  avatar: {
+    backgroundColor: "#E1BEE7",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 8,
+  },
+  avatarText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  name: {
+    fontWeight: "bold",
+    fontSize: 16,
+    color: "#333",
+  },
+  onlineDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#4CAF50",
   },
   message: {
     maxWidth: "75%",

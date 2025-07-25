@@ -17,6 +17,7 @@ type Chat = {
   name: string;
   content: string;
   created_at: string;
+  unreadCount?: number;
 };
 
 const MessagesScreen = () => {
@@ -42,7 +43,7 @@ const MessagesScreen = () => {
 
       if (!response.ok) throw new Error("Failed to fetch inbox");
       const data = await response.json();
-      setMessages(data);
+      setMessages(data); // Using the backend-provided unreadCount
     } catch (error) {
       console.error("❌ Error fetching inbox:", error);
       setMessages([]);
@@ -91,9 +92,16 @@ const MessagesScreen = () => {
             })}
           </Text>
         </View>
-        <Text numberOfLines={1} style={styles.message}>
-          {item.content}
-        </Text>
+        <View style={styles.messageRow}>
+          <Text numberOfLines={1} style={styles.message}>
+            {item.content}
+          </Text>
+          {item.unreadCount && item.unreadCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{item.unreadCount}</Text>
+            </View>
+          )}
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -109,6 +117,7 @@ const MessagesScreen = () => {
 
   return (
     <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#333" />
@@ -119,6 +128,7 @@ const MessagesScreen = () => {
         </TouchableOpacity>
       </View>
 
+      {/* Search Bar */}
       <View style={styles.searchBar}>
         <Ionicons name="search" size={18} color="#999" style={{ marginRight: 8 }} />
         <TextInput
@@ -130,6 +140,7 @@ const MessagesScreen = () => {
         />
       </View>
 
+      {/* Chat List */}
       <FlatList
         data={filteredMessages}
         keyExtractor={(item) => item.id}
@@ -238,8 +249,29 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#999",
   },
+  messageRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   message: {
     color: "#555",
     fontSize: 14,
+    flex: 1,
+  },
+  badge: {
+    backgroundColor: "#FF4FC3",
+    borderRadius: 12,
+    minWidth: 20,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 6,
+    marginLeft: 8,
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "bold",
   },
 });
