@@ -115,7 +115,6 @@ exports.getInbox = async (req, res) => {
 
     if (error) throw error;
 
-    // Extract unique user IDs from messages
     const chatPartners = new Set();
     data.forEach((msg) => {
       if (msg.sender_id !== userId) chatPartners.add(msg.sender_id);
@@ -124,9 +123,8 @@ exports.getInbox = async (req, res) => {
 
     const idsArray = Array.from(chatPartners);
 
-    // Fetch user details for those IDs
     const result = await pool.query(
-      `SELECT id, first_name, last_name, profile_picture 
+      `SELECT id, first_name, last_name 
        FROM patients 
        WHERE id = ANY($1::uuid[])`,
       [idsArray]
@@ -135,13 +133,13 @@ exports.getInbox = async (req, res) => {
     const users = result.rows.map((u) => ({
       id: u.id,
       name: `${u.first_name} ${u.last_name}`,
-      avatar: u.profile_picture || null,
     }));
 
     res.json(users);
   } catch (err) {
-    console.error("❌ Error fetching inbox:", err.message);
+    console.error("❌ Error fetching chat partners:", err.message);
     res.status(500).json({ error: "Failed to fetch chat partners" });
   }
 };
+
 
