@@ -60,4 +60,44 @@ exports.getConversation = async (req, res) => {
   }
 };
 
+exports.getChatPartners = async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const { data, error } = await supabase
+      .from("messages")
+      .select("sender_id, receiver_id")
+      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
+
+    if (error) throw error;
+
+    const chatUserIds = new Set();
+
+    data.forEach(msg => {
+      if (msg.sender_id !== parseInt(userId)) chatUserIds.add(msg.sender_id);
+      if (msg.receiver_id !== parseInt(userId)) chatUserIds.add(msg.receiver_id);
+    });
+
+    const ids = [...chatUserIds];
+
+    const { data: users, error: userError } = await supabase
+      .from("patients")
+      .select("id, first_name, last_name, profile_picture")
+      .in("id", ids);
+
+    if (userError) throw userError;
+
+    const formattedUsers = users.map(user => ({
+      id: user.id,
+      name: `${user.first_name} ${user.last_name}`,
+      avatar: user.profile_picture || null,
+    }));
+
+    res.json(formattedUsers);
+  } catch (err) {
+    console.error("❌ Error fetching chat partners:", err.message);
+    res.status(500).json({ error: "Failed to fetch chat partners" });
+  }
+};
+
 
