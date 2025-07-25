@@ -6,7 +6,6 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   StyleSheet,
   Text,
   TextInput,
@@ -15,13 +14,12 @@ import {
 } from "react-native";
 
 type Message = {
-  id: number;
+  id: string;
   sender_id: string;
   receiver_id: string;
   content: string;
   created_at: string;
-  name?: string;
-  avatar?: string;
+  name: string;
 };
 
 const MessagesScreen = () => {
@@ -38,11 +36,14 @@ const MessagesScreen = () => {
 
       if (!token || !userId) throw new Error("User not authenticated");
 
-      const res = await fetch(`https://pregwell-backend.onrender.com/api/messages/${userId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const res = await fetch(
+        `https://pregwell-backend.onrender.com/api/messages/inbox/${userId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       const data = await res.json();
       setMessages(data);
@@ -64,9 +65,6 @@ const MessagesScreen = () => {
   );
 
   const renderItem = ({ item }: { item: Message }) => {
-    const receiverId =
-      item.sender_id === item.receiver_id ? item.receiver_id : item.sender_id;
-
     return (
       <TouchableOpacity
         style={styles.card}
@@ -74,22 +72,32 @@ const MessagesScreen = () => {
           router.push({
             pathname: "/ChatScreen/[id]",
             params: {
-              id: receiverId,
-              receiverName: item.name || "Chat",
+              id: item.id,
+              receiverName: item.name,
             },
           })
         }
       >
-        <Image source={{ uri: item.avatar || "https://via.placeholder.com/150" }} style={styles.avatar} />
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>
+            {item.name
+              ?.split(" ")
+              .map((n) => n[0])
+              .join("")
+              .toUpperCase()}
+          </Text>
+        </View>
         <View style={styles.textContainer}>
           <View style={styles.nameRow}>
             <Text style={styles.name}>{item.name}</Text>
             <Text style={styles.time}>
-              {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
+              {formatDistanceToNow(new Date(item.created_at), {
+                addSuffix: true,
+              })}
             </Text>
           </View>
           <Text numberOfLines={1} style={styles.message}>
-            {item.content}
+            {item.content || "No message yet"}
           </Text>
         </View>
       </TouchableOpacity>
@@ -125,7 +133,7 @@ const MessagesScreen = () => {
 
       <FlatList
         data={filteredMessages}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={filteredMessages.length === 0 ? styles.emptyList : undefined}
         ListEmptyComponent={<Text>No conversations yet</Text>}
@@ -190,7 +198,15 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
+    backgroundColor: "#E1BEE7",
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 15,
+  },
+  avatarText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
   },
   textContainer: {
     flex: 1,
