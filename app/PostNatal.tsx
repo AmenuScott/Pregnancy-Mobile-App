@@ -1,21 +1,23 @@
-import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import React, { useState } from "react";
+"use client"
+
+import { Ionicons } from "@expo/vector-icons"
+import { LinearGradient } from "expo-linear-gradient"
+import { useRouter } from "expo-router"
+import { useState } from "react"
 import {
+  Alert,
   Dimensions,
   FlatList,
   SafeAreaView,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-} from "react-native";
+} from "react-native"
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window")
 
 // Simplified recovery tips data
 const recoveryTips = [
@@ -47,7 +49,7 @@ const recoveryTips = [
     icon: "water-outline",
     color: "#2196F3",
   },
-];
+]
 
 // Baby care tips data
 const babyCareByAge = [
@@ -123,23 +125,51 @@ const babyCareByAge = [
       },
     ],
   },
-];
+]
+
+// Menstrual symptoms
+const menstrualSymptoms = [
+  { id: "cramps", label: "Cramps", icon: "flash-outline" },
+  { id: "bloating", label: "Bloating", icon: "ellipse-outline" },
+  { id: "headache", label: "Headache", icon: "skull-outline" },
+  { id: "mood_swings", label: "Mood Swings", icon: "happy-outline" },
+  { id: "fatigue", label: "Fatigue", icon: "battery-dead-outline" },
+  { id: "breast_tenderness", label: "Breast Tenderness", icon: "heart-outline" },
+]
 
 const PostNatalScreen = () => {
-  const router = useRouter();
-  const [selectedTab, setSelectedTab] = useState("recovery");
-  const [selectedAgeGroup, setSelectedAgeGroup] = useState("1");
-  const [cycleStartDate, setCycleStartDate] = useState("");
-  const [flowIntensity, setFlowIntensity] = useState("medium");
-  const [hasCramps, setHasCramps] = useState(false);
-  const [notes, setNotes] = useState("");
+  const router = useRouter()
+  const [selectedTab, setSelectedTab] = useState("recovery")
+  const [selectedAgeGroup, setSelectedAgeGroup] = useState("1")
 
-  const renderRecoveryTip = ({ item }) => (
+  // Menstrual tracking state
+  const [cycleStartDate, setCycleStartDate] = useState("")
+  const [flowIntensity, setFlowIntensity] = useState("medium")
+  const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([])
+  const [cycleNotes, setCycleNotes] = useState("")
+
+  const toggleSymptom = (symptomId: string) => {
+    setSelectedSymptoms((prev) =>
+      prev.includes(symptomId) ? prev.filter((id) => id !== symptomId) : [...prev, symptomId],
+    )
+  }
+
+  const saveMenstrualEntry = () => {
+    if (!cycleStartDate) {
+      Alert.alert("Missing Information", "Please enter your cycle start date.")
+      return
+    }
+    Alert.alert("Success", "Menstrual cycle entry saved successfully!")
+    // Reset form
+    setCycleStartDate("")
+    setFlowIntensity("medium")
+    setSelectedSymptoms([])
+    setCycleNotes("")
+  }
+
+  const renderRecoveryTip = ({ item }: { item: any }) => (
     <View style={styles.tipCard}>
-      <LinearGradient
-        colors={[`${item.color}15`, `${item.color}05`]}
-        style={styles.tipCardGradient}
-      >
+      <LinearGradient colors={[`${item.color}15`, `${item.color}05`]} style={styles.tipCardGradient}>
         <View style={styles.tipHeader}>
           <View style={[styles.tipIconContainer, { backgroundColor: item.color }]}>
             <Ionicons name={item.icon} size={24} color="white" />
@@ -149,9 +179,9 @@ const PostNatalScreen = () => {
         <Text style={styles.tipDescription}>{item.description}</Text>
       </LinearGradient>
     </View>
-  );
+  )
 
-  const renderBabyCareTip = ({ item }) => (
+  const renderBabyCareTip = ({ item }: { item: any }) => (
     <View style={styles.babyCareTipCard}>
       <View style={styles.babyCareTipIcon}>
         <Ionicons name={item.icon} size={20} color="#E91E63" />
@@ -161,23 +191,20 @@ const PostNatalScreen = () => {
         <Text style={styles.babyCareTipDescription}>{item.description}</Text>
       </View>
     </View>
-  );
+  )
 
   return (
     <View style={styles.container}>
       {/* Header */}
-      <LinearGradient 
-        colors={["#FCE4EC", "#F06292", "#E91E63"]} 
+      <LinearGradient
+        colors={["#FCE4EC", "#F06292", "#E91E63"]}
         style={styles.header}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
         <SafeAreaView>
           <View style={styles.headerContent}>
-            <TouchableOpacity 
-              style={styles.backButton}
-              onPress={() => router.back()}
-            >
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
               <Ionicons name="chevron-back" size={24} color="white" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Post Natal Care</Text>
@@ -185,22 +212,17 @@ const PostNatalScreen = () => {
               <Ionicons name="information-circle" size={24} color="white" />
             </TouchableOpacity>
           </View>
-          
+
           <View style={styles.headerSubtitle}>
             <Ionicons name="heart" size={20} color="white" style={styles.headerIcon} />
-            <Text style={styles.subtitleText}>
-              Supporting your journey after birth
-            </Text>
+            <Text style={styles.subtitleText}>Supporting your journey after birth</Text>
           </View>
         </SafeAreaView>
       </LinearGradient>
 
-      {/* Simplified Recovery Progress Card */}
+      {/* Recovery Progress Card */}
       <View style={styles.progressContainer}>
-        <LinearGradient
-          colors={["#F8BBD0", "#FCE4EC"]}
-          style={styles.progressGradient}
-        >
+        <LinearGradient colors={["#F8BBD0", "#FCE4EC"]} style={styles.progressGradient}>
           <View style={styles.progressHeader}>
             <View>
               <Text style={styles.progressTitle}>Recovery Journey</Text>
@@ -210,25 +232,18 @@ const PostNatalScreen = () => {
               <Text style={styles.progressPercentage}>75%</Text>
             </View>
           </View>
-          
+
           <View style={styles.progressBarContainer}>
             <View style={styles.progressBar}>
-              <LinearGradient
-                colors={["#E91E63", "#C2185B"]}
-                style={[styles.progressFill, { width: "75%" }]}
-              />
+              <LinearGradient colors={["#E91E63", "#C2185B"]} style={[styles.progressFill, { width: "75%" }]} />
             </View>
           </View>
         </LinearGradient>
       </View>
 
-      {/* Tab Navigation - Only 3 tabs now */}
+      {/* Tab Navigation - Only 3 tabs */}
       <View style={styles.tabContainer}>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tabScrollContent}
-        >
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContent}>
           {[
             { id: "recovery", label: "Recovery", icon: "fitness" },
             { id: "menstrual", label: "Menstrual", icon: "calendar" },
@@ -236,24 +251,16 @@ const PostNatalScreen = () => {
           ].map((tab) => (
             <TouchableOpacity
               key={tab.id}
-              style={[
-                styles.tabButton,
-                selectedTab === tab.id && styles.tabButtonActive
-              ]}
+              style={[styles.tabButton, selectedTab === tab.id && styles.tabButtonActive]}
               onPress={() => setSelectedTab(tab.id)}
             >
-              <Ionicons 
-                name={tab.icon} 
-                size={16} 
-                color={selectedTab === tab.id ? "white" : "#7F8C8D"} 
+              <Ionicons
+                name={tab.icon}
+                size={16}
+                color={selectedTab === tab.id ? "white" : "#7F8C8D"}
                 style={styles.tabIcon}
               />
-              <Text 
-                style={[
-                  styles.tabButtonText,
-                  selectedTab === tab.id && styles.tabButtonTextActive
-                ]}
-              >
+              <Text style={[styles.tabButtonText, selectedTab === tab.id && styles.tabButtonTextActive]}>
                 {tab.label}
               </Text>
             </TouchableOpacity>
@@ -265,30 +272,22 @@ const PostNatalScreen = () => {
         {selectedTab === "recovery" && (
           <View style={styles.recoverySection}>
             <Text style={styles.sectionTitle}>Recovery Tips</Text>
-            <Text style={styles.sectionSubtitle}>
-              Essential guidance for your postpartum recovery
-            </Text>
-            
+            <Text style={styles.sectionSubtitle}>Essential guidance for your postpartum recovery</Text>
+
             <FlatList
               data={recoveryTips}
               renderItem={renderRecoveryTip}
-              keyExtractor={item => item.id}
+              keyExtractor={(item) => item.id}
               scrollEnabled={false}
             />
-            
+
             <View style={styles.warningCard}>
-              <LinearGradient
-                colors={["#FFEBEE", "#FFCDD2"]}
-                style={styles.warningGradient}
-              >
+              <LinearGradient colors={["#FFEBEE", "#FFCDD2"]} style={styles.warningGradient}>
                 <Ionicons name="warning" size={24} color="#F44336" />
                 <Text style={styles.warningTitle}>When to Call Your Doctor</Text>
                 <Text style={styles.warningText}>
-                  • Heavy bleeding or large blood clots{"\n"}
-                  • Fever over 100.4°F (38°C){"\n"}
-                  • Severe headache or vision changes{"\n"}
-                  • Signs of infection at incision site{"\n"}
-                  • Severe abdominal or pelvic pain
+                  • Heavy bleeding or large blood clots{"\n"}• Fever over 100.4°F (38°C){"\n"}• Severe headache or
+                  vision changes{"\n"}• Signs of infection at incision site{"\n"}• Severe abdominal or pelvic pain
                 </Text>
               </LinearGradient>
             </View>
@@ -298,19 +297,18 @@ const PostNatalScreen = () => {
         {selectedTab === "menstrual" && (
           <View style={styles.menstrualSection}>
             <Text style={styles.sectionTitle}>Menstrual Cycle Tracker</Text>
-            <Text style={styles.sectionSubtitle}>
-              Track the return of your menstrual cycle after childbirth
-            </Text>
-            
+            <Text style={styles.sectionSubtitle}>Track the return of your menstrual cycle after childbirth</Text>
+
+            {/* Cycle Tracker Card */}
             <View style={styles.menstrualTrackerCard}>
-              <LinearGradient
-                colors={["#FFF3E0", "#FFE0B2"]}
-                style={styles.menstrualTrackerGradient}
-              >
-                <Text style={styles.menstrualTrackerTitle}>Log Your Period</Text>
-                
+              <LinearGradient colors={["#FFF3E0", "#FFE0B2"]} style={styles.menstrualTrackerGradient}>
+                <View style={styles.trackerHeader}>
+                  <Ionicons name="calendar" size={24} color="#FF9800" />
+                  <Text style={styles.menstrualTrackerTitle}>Log Your Period</Text>
+                </View>
+
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Start Date</Text>
+                  <Text style={styles.inputLabel}>Last Period Start Date</Text>
                   <TextInput
                     style={styles.textInput}
                     placeholder="MM/DD/YYYY"
@@ -318,77 +316,96 @@ const PostNatalScreen = () => {
                     onChangeText={setCycleStartDate}
                   />
                 </View>
-                
+
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Flow Intensity</Text>
                   <View style={styles.flowOptions}>
-                    {["light", "medium", "heavy"].map(flow => (
+                    {["light", "medium", "heavy"].map((flow) => (
                       <TouchableOpacity
                         key={flow}
-                        style={[
-                          styles.flowOption,
-                          flowIntensity === flow && styles.flowOptionSelected
-                        ]}
+                        style={[styles.flowOption, flowIntensity === flow && styles.flowOptionSelected]}
                         onPress={() => setFlowIntensity(flow)}
+                        activeOpacity={0.7}
                       >
-                        <Text 
-                          style={[
-                            styles.flowOptionText,
-                            flowIntensity === flow && styles.flowOptionTextSelected
-                          ]}
-                        >
+                        <Text style={[styles.flowOptionText, flowIntensity === flow && styles.flowOptionTextSelected]}>
                           {flow.charAt(0).toUpperCase() + flow.slice(1)}
                         </Text>
                       </TouchableOpacity>
                     ))}
                   </View>
                 </View>
-                
+
                 <View style={styles.inputGroup}>
-                  <View style={styles.switchContainer}>
-                    <Text style={styles.switchLabel}>Experiencing Cramps</Text>
-                    <Switch
-                      value={hasCramps}
-                      onValueChange={setHasCramps}
-                      trackColor={{ false: "#F5F5F5", true: "#F8BBD0" }}
-                      thumbColor={hasCramps ? "#E91E63" : "#BDBDBD"}
-                    />
+                  <Text style={styles.inputLabel}>Symptoms</Text>
+                  <View style={styles.symptomsGrid}>
+                    {menstrualSymptoms.map((symptom) => (
+                      <TouchableOpacity
+                        key={symptom.id}
+                        style={[
+                          styles.symptomChip,
+                          selectedSymptoms.includes(symptom.id) && styles.symptomChipSelected,
+                        ]}
+                        onPress={() => toggleSymptom(symptom.id)}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons
+                          name={symptom.icon}
+                          size={16}
+                          color={selectedSymptoms.includes(symptom.id) ? "#FF9800" : "#7F8C8D"}
+                        />
+                        <Text
+                          style={[
+                            styles.symptomChipText,
+                            selectedSymptoms.includes(symptom.id) && styles.symptomChipTextSelected,
+                          ]}
+                        >
+                          {symptom.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
                   </View>
                 </View>
-                
+
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Notes</Text>
                   <TextInput
                     style={[styles.textInput, styles.textArea]}
                     placeholder="Any additional symptoms or notes..."
-                    value={notes}
-                    onChangeText={setNotes}
+                    value={cycleNotes}
+                    onChangeText={setCycleNotes}
                     multiline
                     numberOfLines={3}
                   />
                 </View>
-                
-                <TouchableOpacity style={styles.saveButton}>
-                  <LinearGradient
-                    colors={["#FF9800", "#F57C00"]}
-                    style={styles.saveButtonGradient}
-                  >
+
+                <TouchableOpacity style={styles.saveButton} onPress={saveMenstrualEntry} activeOpacity={0.8}>
+                  <LinearGradient colors={["#FF9800", "#F57C00"]} style={styles.saveButtonGradient}>
+                    <Ionicons name="checkmark-circle" size={20} color="white" />
                     <Text style={styles.saveButtonText}>Save Entry</Text>
                   </LinearGradient>
                 </TouchableOpacity>
               </LinearGradient>
             </View>
-            
+
+            {/* Next Period Prediction */}
+            <View style={styles.predictionCard}>
+              <LinearGradient colors={["#E8F5E8", "#C8E6C9"]} style={styles.predictionGradient}>
+                <View style={styles.predictionHeader}>
+                  <Ionicons name="trending-up" size={24} color="#4CAF50" />
+                  <Text style={styles.predictionTitle}>Next Period Estimate</Text>
+                </View>
+                <Text style={styles.predictionDate}>March 15, 2024</Text>
+                <Text style={styles.predictionSubtext}>Based on your last cycle</Text>
+              </LinearGradient>
+            </View>
+
             <View style={styles.menstrualInfoCard}>
-              <LinearGradient
-                colors={["#FFF8E1", "#FFECB3"]}
-                style={styles.menstrualInfoGradient}
-              >
+              <LinearGradient colors={["#FFF8E1", "#FFECB3"]} style={styles.menstrualInfoGradient}>
                 <Ionicons name="information-circle" size={24} color="#FFA000" />
                 <Text style={styles.menstrualInfoTitle}>Did You Know?</Text>
                 <Text style={styles.menstrualInfoText}>
-                  Periods typically return 6-8 weeks after delivery for non-breastfeeding mothers. 
-                  For breastfeeding mothers, it may take several months. The first few cycles may be irregular.
+                  Periods typically return 6-8 weeks after delivery for non-breastfeeding mothers. For breastfeeding
+                  mothers, it may take several months. The first few cycles may be irregular.
                 </Text>
               </LinearGradient>
             </View>
@@ -398,24 +415,19 @@ const PostNatalScreen = () => {
         {selectedTab === "babycare" && (
           <View style={styles.babyCareSection}>
             <Text style={styles.sectionTitle}>Baby Care Basics</Text>
-            <Text style={styles.sectionSubtitle}>
-              Essential care tips for your newborn
-            </Text>
-            
+            <Text style={styles.sectionSubtitle}>Essential care tips for your newborn</Text>
+
             <View style={styles.ageGroupSelector}>
-              {babyCareByAge.map(group => (
+              {babyCareByAge.map((group) => (
                 <TouchableOpacity
                   key={group.id}
-                  style={[
-                    styles.ageGroupButton,
-                    selectedAgeGroup === group.id && styles.ageGroupButtonActive
-                  ]}
+                  style={[styles.ageGroupButton, selectedAgeGroup === group.id && styles.ageGroupButtonActive]}
                   onPress={() => setSelectedAgeGroup(group.id)}
                 >
-                  <Text 
+                  <Text
                     style={[
                       styles.ageGroupButtonText,
-                      selectedAgeGroup === group.id && styles.ageGroupButtonTextActive
+                      selectedAgeGroup === group.id && styles.ageGroupButtonTextActive,
                     ]}
                   >
                     {group.ageGroup}
@@ -423,18 +435,18 @@ const PostNatalScreen = () => {
                 </TouchableOpacity>
               ))}
             </View>
-            
+
             <View style={styles.babyCareContent}>
               {babyCareByAge
-                .find(group => group.id === selectedAgeGroup)
-                .tips.map(tip => renderBabyCareTip({ item: tip }))}
+                .find((group) => group.id === selectedAgeGroup)
+                ?.tips.map((tip) => renderBabyCareTip({ item: tip }))}
             </View>
           </View>
         )}
       </ScrollView>
     </View>
-  );
-};
+  )
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -584,6 +596,7 @@ const styles = StyleSheet.create({
     color: "#7F8C8D",
     marginBottom: 20,
   },
+
   // Recovery Section Styles
   recoverySection: {
     marginBottom: 20,
@@ -648,6 +661,7 @@ const styles = StyleSheet.create({
     color: "#D32F2F",
     lineHeight: 20,
   },
+
   // Menstrual Section Styles
   menstrualSection: {
     marginBottom: 20,
@@ -664,12 +678,17 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     padding: 20,
   },
+  trackerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+    justifyContent: "center",
+  },
   menstrualTrackerTitle: {
     fontSize: 18,
     fontWeight: "bold",
     color: "#FF9800",
-    marginBottom: 20,
-    textAlign: "center",
+    marginLeft: 10,
   },
   inputGroup: {
     marginBottom: 15,
@@ -720,15 +739,35 @@ const styles = StyleSheet.create({
     color: "#FF9800",
     fontWeight: "600",
   },
-  switchContainer: {
+  symptomsGrid: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexWrap: "wrap",
+    marginTop: 5,
   },
-  switchLabel: {
-    fontSize: 14,
+  symptomChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "white",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  symptomChipSelected: {
+    backgroundColor: "#FFF3E0",
+    borderColor: "#FF9800",
+  },
+  symptomChipText: {
+    fontSize: 12,
+    color: "#7F8C8D",
+    marginLeft: 4,
+  },
+  symptomChipTextSelected: {
+    color: "#FF9800",
     fontWeight: "600",
-    color: "#2C3E50",
   },
   saveButton: {
     borderRadius: 25,
@@ -744,11 +783,48 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: "center",
     borderRadius: 25,
+    flexDirection: "row",
+    justifyContent: "center",
   },
   saveButtonText: {
     color: "white",
     fontSize: 16,
     fontWeight: "bold",
+    marginLeft: 8,
+  },
+  predictionCard: {
+    borderRadius: 15,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  predictionGradient: {
+    borderRadius: 15,
+    padding: 20,
+    alignItems: "center",
+  },
+  predictionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  predictionTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#4CAF50",
+    marginLeft: 8,
+  },
+  predictionDate: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#2C3E50",
+    marginBottom: 5,
+  },
+  predictionSubtext: {
+    fontSize: 14,
+    color: "#7F8C8D",
   },
   menstrualInfoCard: {
     borderRadius: 15,
@@ -775,6 +851,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 20,
   },
+
   // Baby Care Section Styles
   babyCareSection: {
     marginBottom: 20,
@@ -840,6 +917,6 @@ const styles = StyleSheet.create({
     color: "#5D6D7E",
     lineHeight: 20,
   },
-});
+})
 
-export default PostNatalScreen;
+export default PostNatalScreen
