@@ -20,6 +20,7 @@ const messageRoutes = require("./routes/messagesRoutes");
 const healthRoutes = require("./routes/healthRoutes");
 const recoveryRoutes = require("./routes/recoveryRoutes");
 
+
 const app = express();
 const server = http.createServer(app);
 
@@ -46,7 +47,7 @@ app.use("/api/exercises", exerciseRoutes);
 app.use("/api/emergency", emergencyRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/health", healthRoutes);
-app.use("/api/recovery", recoveryRoutes);
+app.use("/api/", recoveryRoutes);
 
 // Base route
 app.get("/", (req, res) => {

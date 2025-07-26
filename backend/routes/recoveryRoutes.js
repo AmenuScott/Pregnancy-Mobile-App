@@ -1,11 +1,8 @@
 const express = require("express");
 const router = express.Router();
-const recoveryController = require("../controllers/recoveryController");
+const { addRecoveryLog, getRecoveryLogs } = require("../controllers/recoveryController");
 
-// POST /api/recovery
-router.post("/", recoveryController.saveRecoveryLog);
-
-// (Optional: Get past logs)
-router.get("/:userId", recoveryController.getRecoveryLogs);
+router.post("/recovery/:userId", addRecoveryLog);
+router.get("/recovery/:userId", getRecoveryLogs);
 
 module.exports = router;
