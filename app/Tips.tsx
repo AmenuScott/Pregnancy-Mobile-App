@@ -154,7 +154,15 @@ const HealthTips = () => {
         }
         renderItem={({ item }) => (
           <Animated.View style={styles.card}>
-            <Image source={{ uri: item.image }} style={styles.image} />
+            <Image
+  source={{
+    uri: item.image?.startsWith("http")
+      ? item.image
+      : "https://via.placeholder.com/400x180?text=No+Image",
+  }}
+  style={styles.image}
+/>
+
             <View style={styles.cardContent}>
               <Text style={styles.title}>{item.title}</Text>
               <Text style={styles.source}>Source: {item.source}</Text>
