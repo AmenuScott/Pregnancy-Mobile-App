@@ -40,7 +40,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/", patientRoutes);
 app.use("/api/setup", setupRoutes);
 app.use("/api/notifications", notificationRoutes);
-app.use("/api/tips", tipRoutes);
+app.use("/api/", tipRoutes);
 app.use("/api/exercises", exerciseRoutes);
 app.use("/api/emergency", emergencyRoutes);
 app.use("/api/messages", messageRoutes);
