@@ -1,9 +1,7 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const tipController = require("../controllers/tipController");
+const { getTips } = require('../controllers/tipController');
 
-// Scrape and save tips
-router.get("/", tipController.getTips);
-
+router.get('/tips', getTips);
 
 module.exports = router;
