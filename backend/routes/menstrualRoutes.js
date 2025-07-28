@@ -5,5 +5,6 @@ const { getMenstrualLogs } = require("../controllers/menstrualController");
 
 router.post("/menstrual-logs", createMenstrualLog);
 router.get("/menstrual-logs/:user_id", getMenstrualLogs);
+router.get("/menstrual-insights/:user_id", getMenstrualInsights);
 
 module.exports = router;
