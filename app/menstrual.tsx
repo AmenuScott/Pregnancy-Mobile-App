@@ -82,28 +82,28 @@ const MenstrualScreen = () => {
   }, [])
 
   // Fetch menstrual logs when tab is 'calendar' or userId changes
-  const fetchMenstrualLogs = useCallback(async () => {
-    if (selectedTab === "calendar" && userId) {
-      setLogsLoading(true)
-      try {
-        const response = await fetch(`https://pregwell-backend.onrender.com/api/menstrual-logs/${userId}`)
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
-        }
-        const data = await response.json()
-        setMenstrualLogs(data.logs || [])
-        setNextPeriod(data.nextPeriod || null)
-        setAverageCycle(data.averageCycle || null)
-
-      } catch (error) {
-        console.error("Error fetching menstrual logs:", error)
-        Alert.alert("Error", "Failed to load menstrual logs. Please try again.")
-        setMenstrualLogs([])
-      } finally {
-        setLogsLoading(false)
+const fetchMenstrualLogs = useCallback(async () => {
+  if (selectedTab === "calendar" && userId) {
+    setLogsLoading(true)
+    try {
+      const response = await fetch(`https://pregwell-backend.onrender.com/api/menstrual-logs/${userId}`)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
+      const data = await response.json()
+      setMenstrualLogs(data.logs || [])
+      setNextPeriod(data.nextPeriod || null)
+      setAverageCycle(data.averageCycle || null)
+    } catch (error) {
+      console.error("Error fetching menstrual logs:", error)
+      Alert.alert("Error", "Failed to load menstrual logs. Please try again.")
+      setMenstrualLogs([])
+    } finally {
+      setLogsLoading(false)
     }
-  }, [selectedTab, userId])
+  }
+}, [selectedTab, userId])
+
 
   // Fetch menstrual insights when tab is 'insights' or userId changes
   const fetchMenstrualInsights = useCallback(async () => {
@@ -224,7 +224,8 @@ const saveMenstrualEntry = async () => {
         <LinearGradient colors={["rgba(255,255,255,0.95)", "rgba(255,255,255,0.85)"]} style={styles.overviewCard}>
           <View style={styles.overviewItem}>
             <Ionicons name="calendar-outline" size={24} color="#FF9A56" />
-            <Text style={styles.overviewNumber}>28</Text>
+            <Text style={styles.overviewNumber}>{averageCycle || "--"}</Text>
+
             <Text style={styles.overviewLabel}>Avg Cycle</Text>
           </View>
 
@@ -393,9 +394,14 @@ const saveMenstrualEntry = async () => {
                   <Text style={styles.predictionTitle}>Next Period Estimate</Text>
                 </View>
                 <Text style={styles.predictionDate}>
-  {nextPeriod ? new Date(nextPeriod).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "No prediction yet"}
+  {nextPeriod
+    ? new Date(nextPeriod).toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "Not enough data yet"}
 </Text>
-
                 <Text style={styles.predictionSubtext}>Based on your last cycle</Text>
               </LinearGradient>
             </View>
