@@ -70,7 +70,7 @@ const PostnatalMenu = () => {
 
   const sections = [
     {
-      title: "Recovery Tracker",
+      title: "Recovery Tips",
       subtitle: "Monitor your healing journey",
       icon: "fitness-outline",
       colors: ["#FF6B9D", "#C44569"],
