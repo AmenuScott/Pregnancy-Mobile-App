@@ -6,18 +6,18 @@ import { LinearGradient } from "expo-linear-gradient"
 import { useRouter } from "expo-router"
 import { useCallback, useEffect, useState } from "react"
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native"
 
 const { width } = Dimensions.get("window")
@@ -68,6 +68,9 @@ const MenstrualScreen = () => {
   const [menstrualInsights, setMenstrualInsights] = useState<MenstrualInsight[]>([])
   const [logsLoading, setLogsLoading] = useState(false)
   const [insightsLoading, setInsightsLoading] = useState(false)
+  const [nextPeriod, setNextPeriod] = useState<string | null>(null)
+  const [averageCycle, setAverageCycle] = useState<number | null>(null)
+
 
   // Fetch userId on component mount
   useEffect(() => {
@@ -88,7 +91,10 @@ const MenstrualScreen = () => {
           throw new Error(`HTTP error! status: ${response.status}`)
         }
         const data = await response.json()
-        setMenstrualLogs(data)
+        setMenstrualLogs(data.logs || [])
+        setNextPeriod(data.nextPeriod || null)
+        setAverageCycle(data.averageCycle || null)
+
       } catch (error) {
         console.error("Error fetching menstrual logs:", error)
         Alert.alert("Error", "Failed to load menstrual logs. Please try again.")
@@ -386,7 +392,10 @@ const saveMenstrualEntry = async () => {
                   <Ionicons name="trending-up" size={24} color="#4CAF50" />
                   <Text style={styles.predictionTitle}>Next Period Estimate</Text>
                 </View>
-                <Text style={styles.predictionDate}>March 15, 2024</Text>
+                <Text style={styles.predictionDate}>
+  {nextPeriod ? new Date(nextPeriod).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "No prediction yet"}
+</Text>
+
                 <Text style={styles.predictionSubtext}>Based on your last cycle</Text>
               </LinearGradient>
             </View>
