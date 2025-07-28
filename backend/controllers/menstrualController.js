@@ -76,9 +76,10 @@ exports.getMenstrualInsights = async (req, res) => {
       [user_id]
     );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "No menstrual logs found" });
-    }
+if (result.rows.length === 0) {
+  return res.status(200).json({ cycleDay: null, insights: [] });
+}
+
 
     const startDate = new Date(result.rows[0].cycle_start_date);
     const today = new Date();

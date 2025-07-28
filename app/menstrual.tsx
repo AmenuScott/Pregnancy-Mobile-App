@@ -132,49 +132,53 @@ const MenstrualScreen = () => {
     )
   }
 
-  const saveMenstrualEntry = async () => {
-    if (!cycleStartDate || !userId) {
-      Alert.alert("Missing Information", "Please enter your cycle start date and ensure you are logged in.")
-      return
-    }
-
-    try {
-      const token = await AsyncStorage.getItem("token")
-      const response = await fetch("https://pregwell-backend.onrender.com/api/menstrual-logs", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-        body: JSON.stringify({
-          user_id: userId,
-          start_date: cycleStartDate,
-          flow_intensity: flowIntensity,
-          symptoms: selectedSymptoms, // Sending as an array
-          notes: cycleNotes,
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorData.message || "Unknown error"}`)
-      }
-
-      const result = await response.json()
-      Alert.alert("Success", result.message || "Menstrual cycle entry saved successfully!")
-      // Refetch logs to update the calendar view after saving
-      fetchMenstrualLogs()
-    } catch (error: any) {
-      console.error("Error saving menstrual entry:", error.message)
-      Alert.alert("Error", `Failed to save menstrual entry: ${error.message}. Please try again.`)
-    }
-
-    // Reset form
-    setCycleStartDate("")
-    setFlowIntensity("medium")
-    setSelectedSymptoms([])
-    setCycleNotes("")
+const saveMenstrualEntry = async () => {
+  if (!cycleStartDate) {
+    Alert.alert("Missing Information", "Please enter your cycle start date.");
+    return;
   }
+
+  try {
+    const token = await AsyncStorage.getItem("token");
+    const id = await AsyncStorage.getItem("userId"); // UUID
+
+    if (!id || !token) {
+      Alert.alert("Error", "Missing user ID or token.");
+      return;
+    }
+
+    const res = await fetch("https://pregwell-backend.onrender.com/api/menstrual-logs", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        user_id: id, // Keep as string
+        cycle_start_date: cycleStartDate,
+        flow_intensity: flowIntensity,
+        symptoms: selectedSymptoms.join(", "),
+        notes: cycleNotes,
+      }),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(`HTTP error! status: ${res.status}, message: ${errorData.message || "Unknown error"}`);
+    }
+
+    Alert.alert("Success", "Menstrual cycle entry saved successfully!");
+    // Reset form
+    setCycleStartDate("");
+    setFlowIntensity("medium");
+    setSelectedSymptoms([]);
+    setCycleNotes("");
+  } catch (error: any) {
+    console.error("Error saving menstrual entry:", error.message);
+    Alert.alert("Error", `Failed to save menstrual entry: ${error.message}`);
+  }
+};
+
 
   const formatLogDate = (dateString: string) => {
     try {
