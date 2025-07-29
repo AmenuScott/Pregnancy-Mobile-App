@@ -1,4 +1,4 @@
-const db = require("../config/db");
+const db = require("../db");
 
 // POST - Create or Update Baby Profile
 exports.createOrUpdateBabyProfile = async (req, res) => {
