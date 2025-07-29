@@ -56,8 +56,7 @@ app.use("/api/recovery-tips", recoveryTipsRoutes);
 app.use("/api/", menstrualRoutes);
 app.use("/api", babyTipsRoutes);
 app.use(personalizedRoutes);
-app.use(babyProfileRoutes);
-
+app.use("/api", babyProfileRoutes)
 
 // Base route
 app.get("/", (req, res) => {

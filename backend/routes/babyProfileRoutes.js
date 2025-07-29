@@ -1,8 +1,11 @@
-const express = require("express");
-const router = express.Router();
-const babyProfileController = require("../controllers/babyProfileController");
+const express = require("express")
+const router = express.Router()
+const babyProfileController = require("../controllers/babyProfileController")
 
-router.post("/api/baby-profile", babyProfileController.createOrUpdateBabyProfile);
-router.get("/api/baby-profile/:userId", babyProfileController.getBabyProfile);
+// Create baby profile
+router.post("/baby-profiles", babyProfileController.createBabyProfile)
 
-module.exports = router;
+// Get baby profile by user ID
+router.get("/baby-profiles/:userId", babyProfileController.getBabyProfile)
+
+module.exports = router
