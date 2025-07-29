@@ -1,9 +1,10 @@
 "use client"
 
 import { Ionicons } from "@expo/vector-icons"
+import AsyncStorage from "@react-native-async-storage/async-storage"
 import { LinearGradient } from "expo-linear-gradient"
 import { useRouter } from "expo-router"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   Alert,
   Dimensions,
@@ -21,7 +22,7 @@ import {
 const { width } = Dimensions.get("window")
 const statusBarHeight = Platform.OS === "ios" ? 44 : StatusBar.currentHeight || 24
 
-// Baby care tips by age
+// Baby care tips by age (reusing structure from PostNatalScreen for consistency)
 const babyCareByAge = [
   {
     id: "1",
@@ -99,34 +100,47 @@ const babyCareByAge = [
 
 const BabyCareScreen = () => {
   const router = useRouter()
-  const [selectedTab, setSelectedTab] = useState("tracker")
-  const [selectedAgeGroup, setSelectedAgeGroup] = useState("1")
+  const [selectedTab, setSelectedTab] = useState("tips")
+  const [babyDOB, setBabyDOB] = useState("")
+  const [babyAgeWeeks, setBabyAgeWeeks] = useState<number | null>(null)
+  const [storedDOB, setStoredDOB] = useState("")
+  const [selectedAgeGroup, setSelectedAgeGroup] = useState("1") // For tips section
 
-  // Tracker state
-  const [feedingTime, setFeedingTime] = useState("")
-  const [feedingType, setFeedingType] = useState("breast")
-  const [amount, setAmount] = useState("")
-  const [diaperType, setDiaperType] = useState("")
-  const [sleepDuration, setSleepDuration] = useState("")
-  const [weight, setWeight] = useState("")
-  const [length, setLength] = useState("")
-  const [notes, setNotes] = useState("")
+  // On mount, try to load stored birth date
+  useEffect(() => {
+    const loadDOB = async () => {
+      const savedDOB = await AsyncStorage.getItem("babyDOB")
+      if (savedDOB) {
+        setStoredDOB(savedDOB)
+        calculateAge(savedDOB)
+      }
+    }
+    loadDOB()
+  }, [])
 
-  const handleSave = () => {
-    if (!feedingTime && !amount && !diaperType && !sleepDuration && !weight) {
-      Alert.alert("Missing Info", "Please fill in at least one field.")
+  const calculateAge = (dob: string) => {
+    const birthDate = new Date(dob)
+    const today = new Date()
+    const ageInMs = today.getTime() - birthDate.getTime()
+    const ageInWeeks = Math.floor(ageInMs / (1000 * 60 * 60 * 24 * 7))
+    setBabyAgeWeeks(ageInWeeks)
+  }
+
+  const saveBabyDOB = async () => {
+    if (!babyDOB) {
+      Alert.alert("Enter Baby's Birth Date", "Please enter your baby's birth date in YYYY-MM-DD format.")
       return
     }
-    Alert.alert("Saved", "Baby care log has been saved!")
-    // Reset form
-    setFeedingTime("")
-    setFeedingType("breast")
-    setAmount("")
-    setDiaperType("")
-    setSleepDuration("")
-    setWeight("")
-    setLength("")
-    setNotes("")
+    // Basic date format validation
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(babyDOB)) {
+      Alert.alert("Invalid Date Format", "Please use YYYY-MM-DD format for the birth date.")
+      return
+    }
+    await AsyncStorage.setItem("babyDOB", babyDOB)
+    setStoredDOB(babyDOB)
+    calculateAge(babyDOB)
+    setBabyDOB("")
+    Alert.alert("Success", "Baby's birth date saved!")
   }
 
   const renderBabyCareTip = ({ item }: { item: any }) => (
@@ -170,7 +184,7 @@ const BabyCareScreen = () => {
         <LinearGradient colors={["rgba(255,255,255,0.95)", "rgba(255,255,255,0.85)"]} style={styles.statsCard}>
           <View style={styles.statItem}>
             <Ionicons name="baby-outline" size={24} color="#4ECDC4" />
-            <Text style={styles.statNumber}>12</Text>
+            <Text style={styles.statNumber}>{babyAgeWeeks !== null ? babyAgeWeeks : "--"}</Text>
             <Text style={styles.statLabel}>Weeks Old</Text>
           </View>
 
@@ -196,8 +210,8 @@ const BabyCareScreen = () => {
       <View style={styles.tabContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContent}>
           {[
-            { id: "tracker", label: "Daily Tracker", icon: "clipboard" },
             { id: "tips", label: "Care Tips", icon: "bulb" },
+            { id: "mybaby", label: "My Baby", icon: "person" },
           ].map((tab) => (
             <TouchableOpacity
               key={tab.id}
@@ -219,163 +233,6 @@ const BabyCareScreen = () => {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {selectedTab === "tracker" && (
-          <View style={styles.trackerSection}>
-            <Text style={styles.sectionTitle}>Daily Care Tracker</Text>
-            <Text style={styles.sectionSubtitle}>Log your baby's daily activities and milestones</Text>
-
-            {/* Feeding Section */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Ionicons name="nutrition" size={20} color="#4ECDC4" />
-                <Text style={styles.cardTitle}>Feeding</Text>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Feeding Time</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. 9:00 AM"
-                  value={feedingTime}
-                  onChangeText={setFeedingTime}
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Feeding Type</Text>
-                <View style={styles.buttonRow}>
-                  {[
-                    { key: "breast", label: "Breastfeeding", icon: "heart" },
-                    { key: "bottle", label: "Bottle", icon: "wine" },
-                  ].map((type) => (
-                    <TouchableOpacity
-                      key={type.key}
-                      style={[styles.optionButton, feedingType === type.key && styles.optionSelected]}
-                      onPress={() => setFeedingType(type.key)}
-                    >
-                      <Ionicons name={type.icon} size={16} color={feedingType === type.key ? "#4ECDC4" : "#7F8C8D"} />
-                      <Text style={[styles.optionText, feedingType === type.key && styles.textSelected]}>
-                        {type.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Amount (ml)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. 60"
-                  value={amount}
-                  onChangeText={setAmount}
-                  keyboardType="numeric"
-                />
-              </View>
-            </View>
-
-            {/* Diaper Section */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Ionicons name="refresh" size={20} color="#44A08D" />
-                <Text style={styles.cardTitle}>Diaper Change</Text>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Diaper Type</Text>
-                <View style={styles.buttonRow}>
-                  {[
-                    { key: "Wet", icon: "water" },
-                    { key: "Dirty", icon: "warning" },
-                    { key: "Both", icon: "checkmark-circle" },
-                  ].map((type) => (
-                    <TouchableOpacity
-                      key={type.key}
-                      style={[styles.optionButton, diaperType === type.key && styles.optionSelected]}
-                      onPress={() => setDiaperType(type.key)}
-                    >
-                      <Ionicons name={type.icon} size={16} color={diaperType === type.key ? "#44A08D" : "#7F8C8D"} />
-                      <Text style={[styles.optionText, diaperType === type.key && styles.textSelected]}>
-                        {type.key}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            </View>
-
-            {/* Sleep & Growth Section */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Ionicons name="moon" size={20} color="#4ECDC4" />
-                <Text style={styles.cardTitle}>Sleep & Growth</Text>
-              </View>
-
-              <View style={styles.inputRow}>
-                <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
-                  <Text style={styles.label}>Sleep Duration (hrs)</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. 2.5"
-                    value={sleepDuration}
-                    onChangeText={setSleepDuration}
-                    keyboardType="numeric"
-                  />
-                </View>
-
-                <View style={[styles.inputGroup, { flex: 1, marginLeft: 10 }]}>
-                  <Text style={styles.label}>Weight (kg)</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. 3.8"
-                    value={weight}
-                    onChangeText={setWeight}
-                    keyboardType="numeric"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Length (cm)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. 50"
-                  value={length}
-                  onChangeText={setLength}
-                  keyboardType="numeric"
-                />
-              </View>
-            </View>
-
-            {/* Notes Section */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Ionicons name="document-text" size={20} color="#44A08D" />
-                <Text style={styles.cardTitle}>Additional Notes</Text>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  placeholder="Any observations, milestones, or concerns..."
-                  value={notes}
-                  onChangeText={setNotes}
-                  multiline
-                  numberOfLines={4}
-                />
-              </View>
-            </View>
-
-            {/* Save Button */}
-            <TouchableOpacity style={styles.saveButton} onPress={handleSave} activeOpacity={0.8}>
-              <LinearGradient colors={["#4ECDC4", "#44A08D"]} style={styles.saveGradient}>
-                <Ionicons name="checkmark-circle" size={20} color="white" />
-                <Text style={styles.saveText}>Save Care Log</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        )}
-
         {selectedTab === "tips" && (
           <View style={styles.tipsSection}>
             <Text style={styles.sectionTitle}>Baby Care Tips</Text>
@@ -421,10 +278,69 @@ const BabyCareScreen = () => {
             </View>
           </View>
         )}
+
+        {selectedTab === "mybaby" && (
+          <View style={styles.myBabySection}>
+            <Text style={styles.sectionTitle}>My Baby's Profile</Text>
+            <Text style={styles.sectionSubtitle}>Manage your baby's key information</Text>
+
+            {!storedDOB ? (
+              <View style={styles.inputCard}>
+                <LinearGradient colors={["#F0F4F8", "#E6EEF3"]} style={styles.inputCardGradient}>
+                  <Text style={styles.label}>Enter Baby's Birth Date</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="YYYY-MM-DD"
+                    value={babyDOB}
+                    onChangeText={setBabyDOB}
+                    keyboardType="numeric" // Suggest numeric keyboard for date input
+                  />
+                  <TouchableOpacity onPress={saveBabyDOB} style={styles.saveButton}>
+                    <LinearGradient colors={["#4ECDC4", "#44A08D"]} style={styles.saveButtonGradient}>
+                      <Ionicons name="calendar" size={18} color="white" />
+                      <Text style={styles.saveButtonText}>Save Birth Date</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </LinearGradient>
+              </View>
+            ) : (
+              <View style={styles.infoCard}>
+                <LinearGradient colors={["#E0F7FA", "#B2EBF2"]} style={styles.infoGradient}>
+                  <View style={styles.infoItem}>
+                    <Ionicons name="calendar-outline" size={20} color="#00ACC1" />
+                    <Text style={styles.infoItemText}>Born on: {storedDOB}</Text>
+                  </View>
+                  <View style={styles.infoItem}>
+                    <Ionicons name="baby-outline" size={20} color="#00ACC1" />
+                    <Text style={styles.infoItemText}>Your baby is {babyAgeWeeks} week(s) old</Text>
+                  </View>
+                  <View style={styles.infoItem}>
+                    <Ionicons name="medkit-outline" size={20} color="#00ACC1" />
+                    <Text style={styles.infoItemText}>Next vaccine: 10-week immunization</Text>
+                  </View>
+                  <View style={styles.infoItem}>
+                    <Ionicons name="bulb-outline" size={20} color="#00ACC1" />
+                    <Text style={styles.infoItemText}>Personalized Tip: Introduce short tummy time daily</Text>
+                  </View>
+                  <View style={styles.infoItem}>
+                    <Ionicons name="sparkles-outline" size={20} color="#00ACC1" />
+                    <Text style={styles.infoItemText}>You're doing amazing! Keep it up 💖</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setStoredDOB("")} style={styles.editButton}>
+                    <Ionicons name="pencil-outline" size={16} color="#00ACC1" />
+                    <Text style={styles.editButtonText}>Edit Birth Date</Text>
+                  </TouchableOpacity>
+                </LinearGradient>
+              </View>
+            )}
+          </View>
+        )}
       </ScrollView>
     </View>
   )
 }
+
+export default BabyCareScreen
 
 const styles = StyleSheet.create({
   container: {
@@ -558,112 +474,11 @@ const styles = StyleSheet.create({
     color: "#7F8C8D",
     marginBottom: 20,
   },
-  trackerSection: {
-    marginBottom: 20,
-  },
   tipsSection: {
     marginBottom: 20,
   },
-  card: {
-    backgroundColor: "white",
-    borderRadius: 15,
-    padding: 20,
-    marginBottom: 15,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 15,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#2C3E50",
-    marginLeft: 8,
-  },
-  inputGroup: {
-    marginBottom: 15,
-  },
-  inputRow: {
-    flexDirection: "row",
-    marginBottom: 15,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#2C3E50",
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: "#f8fafc",
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: "#2C3E50",
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: "top",
-  },
-  buttonRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginTop: 5,
-  },
-  optionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f8fafc",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  optionSelected: {
-    backgroundColor: "#E0F7FA",
-    borderColor: "#4ECDC4",
-  },
-  optionText: {
-    fontSize: 12,
-    color: "#7F8C8D",
-    marginLeft: 4,
-  },
-  textSelected: {
-    color: "#4ECDC4",
-    fontWeight: "600",
-  },
-  saveButton: {
-    borderRadius: 25,
-    overflow: "hidden",
-    marginTop: 10,
-    shadowColor: "#4ECDC4",
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-  },
-  saveGradient: {
-    paddingVertical: 12,
-    alignItems: "center",
-    borderRadius: 25,
-    flexDirection: "row",
-    justifyContent: "center",
-  },
-  saveText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
-    marginLeft: 8,
+  myBabySection: {
+    marginBottom: 20,
   },
   ageGroupSelector: {
     flexDirection: "row",
@@ -736,7 +551,7 @@ const styles = StyleSheet.create({
   infoGradient: {
     borderRadius: 15,
     padding: 20,
-    alignItems: "center",
+    alignItems: "flex-start", // Align items to start for list
   },
   infoTitle: {
     fontSize: 18,
@@ -744,6 +559,8 @@ const styles = StyleSheet.create({
     color: "#00ACC1",
     marginTop: 10,
     marginBottom: 10,
+    textAlign: "center",
+    width: "100%",
   },
   infoText: {
     fontSize: 14,
@@ -751,6 +568,84 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 20,
   },
+  inputCard: {
+    borderRadius: 15,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  inputCardGradient: {
+    borderRadius: 15,
+    padding: 20,
+    alignItems: "center",
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 10,
+    color: "#2C3E50",
+  },
+  input: {
+    backgroundColor: "white",
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: "#2C3E50",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    width: "100%",
+    marginBottom: 15,
+  },
+  saveButton: {
+    width: "100%",
+    borderRadius: 25,
+    overflow: "hidden",
+    shadowColor: "#4ECDC4",
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  saveButtonGradient: {
+    paddingVertical: 12,
+    alignItems: "center",
+    borderRadius: 25,
+    flexDirection: "row",
+    justifyContent: "center",
+  },
+  saveButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+    marginLeft: 8,
+  },
+  infoItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+    width: "100%",
+  },
+  infoItemText: {
+    fontSize: 14,
+    color: "#00695C",
+    marginLeft: 10,
+  },
+  editButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 20,
+    backgroundColor: "#E0F7FA",
+  },
+  editButtonText: {
+    color: "#00ACC1",
+    fontSize: 14,
+    fontWeight: "600",
+    marginLeft: 5,
+  },
 })
-
-export default BabyCareScreen
