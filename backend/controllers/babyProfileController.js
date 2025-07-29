@@ -14,10 +14,11 @@ exports.createBabyProfile = async (req, res) => {
     )
     res.status(201).json(result.rows[0])
   } catch (error) {
-    console.error("Error creating baby profile:", error)
-    res.status(500).json({ message: "Internal server error" })
+    console.error("💥 CREATE BABY PROFILE ERROR:", error.message)
+    res.status(500).json({ message: "Internal server error", error: error.message })
   }
 }
+
 
 exports.getBabyProfile = async (req, res) => {
   const { userId } = req.params
