@@ -52,6 +52,27 @@ const menstrualSymptoms = [
   { id: "nausea", label: "Nausea", icon: "sad-outline" },
 ]
 
+// Add this helper function outside the component
+const calculateDaysUntilNextPeriod = (nextPeriodDate: string | null) => {
+  if (!nextPeriodDate) return "--"
+  try {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0) // Normalize to start of day
+    const nextPeriod = new Date(nextPeriodDate)
+    nextPeriod.setHours(0, 0, 0, 0) // Normalize to start of day
+
+    const diffTime = nextPeriod.getTime() - today.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+    if (diffDays < 0) return "Overdue"
+    if (diffDays === 0) return "Today"
+    return diffDays.toString()
+  } catch (e) {
+    console.error("Error calculating days until next period:", e)
+    return "--"
+  }
+}
+
 const MenstrualScreen = () => {
   const router = useRouter()
   const [selectedTab, setSelectedTab] = useState("tracker")
@@ -68,9 +89,9 @@ const MenstrualScreen = () => {
   const [menstrualInsights, setMenstrualInsights] = useState<MenstrualInsight[]>([])
   const [logsLoading, setLogsLoading] = useState(false)
   const [insightsLoading, setInsightsLoading] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isLogPeriodActive, setIsLogPeriodActive] = useState(true) // Controls if inputs are editable
   const [nextPeriod, setNextPeriod] = useState<string | null>(null)
-  const [averageCycle, setAverageCycle] = useState<number | null>(null)
-
 
   // Fetch userId on component mount
   useEffect(() => {
@@ -82,35 +103,43 @@ const MenstrualScreen = () => {
   }, [])
 
   // Fetch menstrual logs when tab is 'calendar' or userId changes
-const fetchMenstrualLogs = useCallback(async () => {
-  if (selectedTab === "calendar" && userId) {
-    setLogsLoading(true)
-    try {
-      const response = await fetch(`https://pregwell-backend.onrender.com/api/menstrual-logs/${userId}`)
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      const data = await response.json()
-      setMenstrualLogs(data.logs || [])
-      setNextPeriod(data.nextPeriod || null)
-      setAverageCycle(data.averageCycle || null)
-    } catch (error) {
-      console.error("Error fetching menstrual logs:", error)
-      Alert.alert("Error", "Failed to load menstrual logs. Please try again.")
-      setMenstrualLogs([])
-    } finally {
-      setLogsLoading(false)
-    }
-  }
-}, [selectedTab, userId])
+  const fetchMenstrualLogs = useCallback(async () => {
+    if (selectedTab === "calendar" && userId) {
+      setLogsLoading(true)
+      try {
+        const response = await fetch(`https://pregwell-backend.onrender.com/api/menstrual-logs/${userId}`)
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+        const data = await response.json()
+        setMenstrualLogs(data.logs)
+        setNextPeriod(data.nextPeriod)
 
+        if (data.nextPeriod) {
+          const nextPeriodDateObj = new Date(data.nextPeriod)
+          const today = new Date()
+          today.setHours(0, 0, 0, 0) // Normalize to start of day
+          nextPeriodDateObj.setHours(0, 0, 0, 0) // Normalize to start of day
+          setIsLogPeriodActive(nextPeriodDateObj <= today) // If next period is today or past, enable inputs
+        } else {
+          setIsLogPeriodActive(true) // If no next period data, inputs are active
+        }
+      } catch (error) {
+        console.error("Error fetching menstrual logs:", error)
+        Alert.alert("Error", "Failed to load menstrual logs. Please try again.")
+        setMenstrualLogs([])
+      } finally {
+        setLogsLoading(false)
+      }
+    }
+  }, [selectedTab, userId])
 
   // Fetch menstrual insights when tab is 'insights' or userId changes
   const fetchMenstrualInsights = useCallback(async () => {
     if (selectedTab === "insights" && userId) {
       setInsightsLoading(true)
       try {
-        const response = await fetch(`https://pregwell-backend.onrender.com/api/menstrual-insights`)
+        const response = await fetch(`https://pregwell-backend.onrender.com/api/menstrual-insights/${userId}`)
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`)
         }
@@ -138,60 +167,78 @@ const fetchMenstrualLogs = useCallback(async () => {
     )
   }
 
-const saveMenstrualEntry = async () => {
-  if (!cycleStartDate) {
-    Alert.alert("Missing Information", "Please enter your cycle start date.");
-    return;
+  const saveMenstrualEntry = async () => {
+    if (!cycleStartDate || !userId) {
+      Alert.alert("Missing Information", "Please enter your cycle start date and ensure you are logged in.")
+      return
+    }
+    if (isSaving) return // Prevent double submission
+
+    setIsSaving(true) // Set saving state to true
+
+    try {
+      const token = await AsyncStorage.getItem("token")
+      const id = await AsyncStorage.getItem("userId")
+      if (!id || !token) {
+        Alert.alert("Error", "Missing user ID or token.")
+        return
+      }
+
+      const res = await fetch("https://pregwell-backend.onrender.com/api/menstrual-logs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          user_id: id,
+          start_date: cycleStartDate,
+          flow_intensity: flowIntensity,
+          symptoms: selectedSymptoms, // Sending as an array
+          notes: cycleNotes,
+        }),
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(`HTTP error! status: ${res.status}, message: ${errorData.message || "Unknown error"}`)
+      }
+
+      Alert.alert("Success", "Menstrual cycle entry saved successfully!")
+      // Reset form
+      setCycleStartDate("")
+      setFlowIntensity("medium")
+      setSelectedSymptoms([])
+      setCycleNotes("")
+      setIsLogPeriodActive(false) // Set inputs to read-only after successful save
+      fetchMenstrualLogs() // Re-fetch logs to update calendar and next period prediction
+    } catch (error: any) {
+      console.error("Error saving menstrual entry:", error.message)
+      Alert.alert("Error", `Failed to save menstrual entry: ${error.message}`)
+    } finally {
+      setIsSaving(false) // Set saving state to false
+    }
   }
 
-  try {
-    const token = await AsyncStorage.getItem("token");
-    const id = await AsyncStorage.getItem("userId"); // UUID
-
-    if (!id || !token) {
-      Alert.alert("Error", "Missing user ID or token.");
-      return;
-    }
-
-    const res = await fetch("https://pregwell-backend.onrender.com/api/menstrual-logs", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        user_id: id, // Keep as string
-        cycle_start_date: cycleStartDate,
-        flow_intensity: flowIntensity,
-        symptoms: selectedSymptoms.join(", "),
-        notes: cycleNotes,
-      }),
-    });
-
-    if (!res.ok) {
-      const errorData = await res.json();
-      throw new Error(`HTTP error! status: ${res.status}, message: ${errorData.message || "Unknown error"}`);
-    }
-
-    Alert.alert("Success", "Menstrual cycle entry saved successfully!");
-    // Reset form
-    setCycleStartDate("");
-    setFlowIntensity("medium");
-    setSelectedSymptoms([]);
-    setCycleNotes("");
-  } catch (error: any) {
-    console.error("Error saving menstrual entry:", error.message);
-    Alert.alert("Error", `Failed to save menstrual entry: ${error.message}`);
+  const resetTrackerForm = () => {
+    setCycleStartDate("")
+    setFlowIntensity("medium")
+    setSelectedSymptoms([])
+    setCycleNotes("")
+    setIsLogPeriodActive(true) // Make inputs editable again
   }
-};
-
 
   const formatLogDate = (dateString: string) => {
     try {
       const date = new Date(dateString)
+      if (isNaN(date.getTime())) {
+        // Check if date is invalid
+        return "Invalid Date"
+      }
       return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
     } catch (e) {
-      return dateString
+      console.error("Error formatting date:", e)
+      return "Invalid Date" // Return a clear message for invalid dates
     }
   }
 
@@ -224,8 +271,7 @@ const saveMenstrualEntry = async () => {
         <LinearGradient colors={["rgba(255,255,255,0.95)", "rgba(255,255,255,0.85)"]} style={styles.overviewCard}>
           <View style={styles.overviewItem}>
             <Ionicons name="calendar-outline" size={24} color="#FF9A56" />
-            <Text style={styles.overviewNumber}>{averageCycle || "--"}</Text>
-
+            <Text style={styles.overviewNumber}>28</Text>
             <Text style={styles.overviewLabel}>Avg Cycle</Text>
           </View>
 
@@ -241,7 +287,7 @@ const saveMenstrualEntry = async () => {
 
           <View style={styles.overviewItem}>
             <Ionicons name="trending-up-outline" size={24} color="#FF9A56" />
-            <Text style={styles.overviewNumber}>12</Text>
+            <Text style={styles.overviewNumber}>{calculateDaysUntilNextPeriod(nextPeriod)}</Text>
             <Text style={styles.overviewLabel}>Days Until</Text>
           </View>
         </LinearGradient>
@@ -291,10 +337,11 @@ const saveMenstrualEntry = async () => {
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Last Period Start Date</Text>
                   <TextInput
-                    style={styles.textInput}
+                    style={[styles.textInput, !isLogPeriodActive && styles.textInputDisabled]}
                     placeholder="MM/DD/YYYY"
                     value={cycleStartDate}
                     onChangeText={setCycleStartDate}
+                    editable={isLogPeriodActive} // Add this
                   />
                 </View>
 
@@ -308,9 +355,14 @@ const saveMenstrualEntry = async () => {
                     ].map((flow) => (
                       <TouchableOpacity
                         key={flow.key}
-                        style={[styles.flowOption, flowIntensity === flow.key && styles.flowOptionSelected]}
-                        onPress={() => setFlowIntensity(flow.key)}
-                        activeOpacity={0.7}
+                        style={[
+                          styles.flowOption,
+                          flowIntensity === flow.key && styles.flowOptionSelected,
+                          !isLogPeriodActive && styles.flowOptionDisabled,
+                        ]}
+                        onPress={() => isLogPeriodActive && setFlowIntensity(flow.key)}
+                        activeOpacity={isLogPeriodActive ? 0.7 : 1}
+                        disabled={!isLogPeriodActive} // Add this
                       >
                         <Ionicons
                           name={flow.icon}
@@ -336,9 +388,11 @@ const saveMenstrualEntry = async () => {
                         style={[
                           styles.symptomChip,
                           selectedSymptoms.includes(symptom.id) && styles.symptomChipSelected,
+                          !isLogPeriodActive && styles.symptomChipDisabled,
                         ]}
-                        onPress={() => toggleSymptom(symptom.id)}
-                        activeOpacity={0.7}
+                        onPress={() => isLogPeriodActive && toggleSymptom(symptom.id)}
+                        activeOpacity={isLogPeriodActive ? 0.7 : 1}
+                        disabled={!isLogPeriodActive} // Add this
                       >
                         <Ionicons
                           name={symptom.icon}
@@ -367,15 +421,41 @@ const saveMenstrualEntry = async () => {
                     onChangeText={setCycleNotes}
                     multiline
                     numberOfLines={3}
+                    editable={isLogPeriodActive} // Add this
                   />
                 </View>
 
-                <TouchableOpacity style={styles.saveButton} onPress={saveMenstrualEntry} activeOpacity={0.8}>
-                  <LinearGradient colors={["#FF9800", "#F57C00"]} style={styles.saveButtonGradient}>
-                    <Ionicons name="checkmark-circle" size={20} color="white" />
-                    <Text style={styles.saveButtonText}>Save Entry</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
+                {isLogPeriodActive ? (
+                  <TouchableOpacity
+                    style={styles.saveButton}
+                    onPress={saveMenstrualEntry}
+                    activeOpacity={0.8}
+                    disabled={isSaving}
+                  >
+                    <LinearGradient colors={["#FF9800", "#F57C00"]} style={styles.saveButtonGradient}>
+                      {isSaving ? (
+                        <ActivityIndicator size="small" color="white" />
+                      ) : (
+                        <Ionicons name="checkmark-circle" size={20} color="white" />
+                      )}
+                      <Text style={styles.saveButtonText}>{isSaving ? "Saving..." : "Save Entry"}</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity style={styles.logNewButton} onPress={resetTrackerForm} activeOpacity={0.8}>
+                    <LinearGradient colors={["#4CAF50", "#388E3C"]} style={styles.saveButtonGradient}>
+                      <Ionicons name="add-circle" size={20} color="white" />
+                      <Text style={styles.saveButtonText}>Log New Period</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                )}
+
+                {!isLogPeriodActive && (
+                  <View style={styles.readOnlyMessageContainer}>
+                    <Ionicons name="lock-closed-outline" size={18} color="#7F8C8D" />
+                    <Text style={styles.readOnlyMessageText}>Inputs are locked until your next estimated period.</Text>
+                  </View>
+                )}
               </LinearGradient>
             </View>
           </View>
@@ -393,15 +473,7 @@ const saveMenstrualEntry = async () => {
                   <Ionicons name="trending-up" size={24} color="#4CAF50" />
                   <Text style={styles.predictionTitle}>Next Period Estimate</Text>
                 </View>
-                <Text style={styles.predictionDate}>
-  {nextPeriod
-    ? new Date(nextPeriod).toLocaleDateString("en-US", {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      })
-    : "Not enough data yet"}
-</Text>
+                <Text style={styles.predictionDate}>March 15, 2024</Text>
                 <Text style={styles.predictionSubtext}>Based on your last cycle</Text>
               </LinearGradient>
             </View>
@@ -421,14 +493,11 @@ const saveMenstrualEntry = async () => {
                       <Text style={styles.historyDate}>{formatLogDate(log.start_date)}</Text>
                       <Text style={styles.historyDetails}>
                         {log.flow_intensity.charAt(0).toUpperCase() + log.flow_intensity.slice(1)} flow •{" "}
-                        <Text style={styles.historyDetails}>
-  {log.flow_intensity.charAt(0).toUpperCase() + log.flow_intensity.slice(1)} flow •{" "}
-  {Array.isArray(log.symptoms)
-    ? log.symptoms.length > 0
-      ? log.symptoms.join(", ")
-      : "No symptoms"
-    : log.symptoms || "No symptoms"}
-</Text>
+                        {Array.isArray(log.symptoms) && log.symptoms.length > 0
+                          ? log.symptoms.join(", ")
+                          : typeof log.symptoms === "string" && log.symptoms // If it's a string and not empty
+                            ? log.symptoms
+                            : "No symptoms"}
                       </Text>
                     </View>
                     <View style={styles.historyRight}>
@@ -886,6 +955,43 @@ const styles = StyleSheet.create({
     color: "#7F8C8D",
     textAlign: "center",
     marginTop: 20,
+  },
+  textInputDisabled: {
+    backgroundColor: "#f0f0f0",
+    color: "#a0a0a0",
+  },
+  flowOptionDisabled: {
+    backgroundColor: "#f0f0f0",
+    borderColor: "#e0e0e0",
+  },
+  symptomChipDisabled: {
+    backgroundColor: "#f0f0f0",
+    borderColor: "#e0e0e0",
+  },
+  logNewButton: {
+    borderRadius: 25,
+    overflow: "hidden",
+    marginTop: 10,
+    shadowColor: "#4CAF50", // Green shadow for "Log New Period"
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  readOnlyMessageContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#E0E0E0",
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 15,
+    justifyContent: "center",
+  },
+  readOnlyMessageText: {
+    fontSize: 12,
+    color: "#7F8C8D",
+    marginLeft: 8,
+    textAlign: "center",
   },
 })
 
