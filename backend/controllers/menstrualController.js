@@ -63,40 +63,15 @@ exports.getMenstrualLogs = async (req, res) => {
   }
 };
 
+// menstrualController.js
 exports.getMenstrualInsights = async (req, res) => {
-  const { user_id } = req.params;
-
   try {
     const result = await pool.query(
-      `SELECT cycle_start_date
-       FROM menstrual_logs
-       WHERE user_id = $1
-       ORDER BY cycle_start_date DESC
-       LIMIT 1`,
-      [user_id]
+      `SELECT * FROM menstrual_insights ORDER BY RANDOM() LIMIT 5` // Random 5 insights
     );
-
-if (result.rows.length === 0) {
-  return res.status(200).json({ cycleDay: null, insights: [] });
-}
-
-
-    const startDate = new Date(result.rows[0].cycle_start_date);
-    const today = new Date();
-    const daysPassed = Math.floor((today - startDate) / (1000 * 60 * 60 * 24)) + 1;
-
-    const insights = await pool.query(
-      `SELECT * FROM menstrual_insights
-       WHERE day_number = $1`,
-      [daysPassed]
-    );
-
-    res.json({
-      cycleDay: daysPassed,
-      insights: insights.rows,
-    });
-  } catch (error) {
-    console.error("Error fetching insights:", error.message);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(200).json(result.rows);
+  } catch (err) {
+    console.error("Error fetching insights:", err.message);
+    res.status(500).json({ message: "Server error" });
   }
 };

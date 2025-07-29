@@ -110,7 +110,7 @@ const fetchMenstrualLogs = useCallback(async () => {
     if (selectedTab === "insights" && userId) {
       setInsightsLoading(true)
       try {
-        const response = await fetch(`https://pregwell-backend.onrender.com/api/menstrual-insights/${userId}`)
+        const response = await fetch(`https://pregwell-backend.onrender.com/api/menstrual-insights`)
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`)
         }
@@ -421,7 +421,14 @@ const saveMenstrualEntry = async () => {
                       <Text style={styles.historyDate}>{formatLogDate(log.start_date)}</Text>
                       <Text style={styles.historyDetails}>
                         {log.flow_intensity.charAt(0).toUpperCase() + log.flow_intensity.slice(1)} flow •{" "}
-                        {log.symptoms.length > 0 ? log.symptoms.join(", ") : "No symptoms"}
+                        <Text style={styles.historyDetails}>
+  {log.flow_intensity.charAt(0).toUpperCase() + log.flow_intensity.slice(1)} flow •{" "}
+  {Array.isArray(log.symptoms)
+    ? log.symptoms.length > 0
+      ? log.symptoms.join(", ")
+      : "No symptoms"
+    : log.symptoms || "No symptoms"}
+</Text>
                       </Text>
                     </View>
                     <View style={styles.historyRight}>
