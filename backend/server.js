@@ -22,6 +22,8 @@ const recoveryRoutes = require("./routes/recoveryRoutes");
 const recoveryTipsRoutes = require("./routes/recoveryTipsRoutes")
 const menstrualRoutes = require("./routes/menstrualRoutes");
 const babyTipsRoutes = require("./routes/babyTipsRoutes")
+const personalizedRoutes = require("./routes/personalizedRoutes");
+const babyProfileRoutes = require("./routes/babyProfileRoutes");
 
 const app = express();
 const server = http.createServer(app);
@@ -52,7 +54,10 @@ app.use("/api/health", healthRoutes);
 app.use("/api/", recoveryRoutes);
 app.use("/api/recovery-tips", recoveryTipsRoutes);
 app.use("/api/", menstrualRoutes);
-app.use("/api", babyTipsRoutes)
+app.use("/api", babyTipsRoutes);
+app.use(personalizedRoutes);
+app.use(babyProfileRoutes);
+
 
 // Base route
 app.get("/", (req, res) => {
