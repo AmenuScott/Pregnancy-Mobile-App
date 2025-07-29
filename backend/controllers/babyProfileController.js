@@ -33,9 +33,10 @@ exports.getBabyProfile = async (req, res) => {
       return res.status(404).json({ message: "Baby profile not found" })
     }
 
-    res.status(200).json(result.rows[0])
+    res.json(result.rows[0])
   } catch (error) {
-    console.error("Error fetching baby profile:", error)
+    console.error("💥 GET BABY PROFILE ERROR:", error.message)
     res.status(500).json({ message: "Internal server error" })
   }
 }
+
