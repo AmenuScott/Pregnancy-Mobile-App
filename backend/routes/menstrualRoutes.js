@@ -7,7 +7,6 @@ const menstrualController = require("../controllers/menstrualController");
 
 router.post("/menstrual-logs", createMenstrualLog);
 router.get("/menstrual-logs/:user_id", getMenstrualLogs);
-router.get("/api/menstrual-insights", menstrualController.getMenstrualInsights)
-
+router.get("/menstrual-insights", menstrualController.getMenstrualInsights);
 
 module.exports = router;
