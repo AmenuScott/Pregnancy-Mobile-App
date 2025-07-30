@@ -5,17 +5,19 @@ import AsyncStorage from "@react-native-async-storage/async-storage"
 import { LinearGradient } from "expo-linear-gradient"
 import * as Location from "expo-location"
 import { useRouter } from "expo-router"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"; // Added useCallback
 import {
-    ActivityIndicator,
-    Alert,
-    Linking,
-    SafeAreaView,
-    ScrollView, Share, StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Linking,
+  SafeAreaView,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native"
 
 const quickActions = [
@@ -24,18 +26,50 @@ const quickActions = [
   { id: "3", title: "Share Location", icon: "share", color: "#9C27B0", action: "location" },
 ]
 
+// Define types for emergency contacts
+type EmergencyContact = {
+  id: string
+  name: string
+  number: string
+  description?: string
+}
+
 export default function EmergencyScreen() {
   const router = useRouter()
-  const [userId, setUserId] = useState(null)
+  const [userId, setUserId] = useState<string | null>(null) // Explicitly type userId
   const [selectedTab, setSelectedTab] = useState("emergency")
   const [loading, setLoading] = useState(false)
   const [locationLoading, setLocationLoading] = useState(false)
-  const [emergencyContacts, setEmergencyContacts] = useState([])
+  const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([]) // Explicitly type emergencyContacts
   const [name, setName] = useState("")
   const [number, setNumber] = useState("")
   const [description, setDescription] = useState("")
   const [showForm, setShowForm] = useState(false)
-  const [userLocation, setUserLocation] = useState(null)
+  const [userLocation, setUserLocation] = useState<Location.LocationObjectCoords | null>(null) // Explicitly type userLocation
+
+  // Function to fetch contacts - wrapped in useCallback
+  const fetchContacts = useCallback(async () => {
+    if (!userId) return // Ensure userId is available
+    try {
+      const res = await fetch(`https://pregwell-backend.onrender.com/api/emergency_contacts/${userId}`)
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`)
+      }
+      const data = await res.json()
+      setEmergencyContacts(data.contacts || [])
+    } catch (err) {
+      console.log("Error fetching contacts:", err)
+      Alert.alert("Error", "Failed to load emergency contacts.")
+    }
+  }, [userId]) // Dependency on userId
+
+  // Function to reset the add contact form
+  const resetForm = useCallback(() => {
+    setName("")
+    setNumber("")
+    setDescription("")
+    setShowForm(false)
+  }, [])
 
   useEffect(() => {
     const loadUserId = async () => {
@@ -50,8 +84,10 @@ export default function EmergencyScreen() {
   }, [])
 
   useEffect(() => {
-    if (userId) fetchContacts()
-  }, [userId])
+    if (userId) {
+      fetchContacts() // Fetch contacts when userId becomes available
+    }
+  }, [userId, fetchContacts]) // Added fetchContacts to dependencies
 
   const requestLocationPermission = async () => {
     try {
@@ -75,31 +111,23 @@ export default function EmergencyScreen() {
 
   const getCurrentLocation = async () => {
     try {
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      })
+      const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High })
       setUserLocation(location.coords)
     } catch (error) {
       console.log("Get location error:", error)
     }
   }
 
-  const fetchContacts = async () => {
-    try {
-      const res = await fetch(`https://pregwell-backend.onrender.com/api/emergency_contacts/${userId}`)
-      const data = await res.json()
-      setEmergencyContacts(data.contacts || [])
-    } catch (err) {
-      console.log("Error fetching contacts:", err)
-    }
-  }
-
+  // Add a new emergency contact
   const handleAddContact = async () => {
+    if (!userId) {
+      Alert.alert("Error", "User not logged in. Cannot add contact.")
+      return
+    }
     if (!name.trim() || !number.trim()) {
       Alert.alert("Missing Information", "Please enter both name and phone number.")
       return
     }
-
     try {
       const res = await fetch(`https://pregwell-backend.onrender.com/api/emergency_contacts/${userId}`, {
         method: "POST",
@@ -107,13 +135,9 @@ export default function EmergencyScreen() {
         body: JSON.stringify({ name, number, description }),
       })
       const data = await res.json()
-
       if (res.ok) {
-        setName("")
-        setNumber("")
-        setDescription("")
-        setShowForm(false)
-        fetchContacts()
+        resetForm()
+        fetchContacts() // Refresh the list after adding
         Alert.alert("Success", "Emergency contact added successfully!")
       } else {
         Alert.alert("Failed to add contact", data.message || "Try again later.")
@@ -124,17 +148,31 @@ export default function EmergencyScreen() {
     }
   }
 
-  const handleDeleteContact = async (contactId, contactName) => {
-    Alert.alert("Delete Contact", `Remove ${contactName}?`, [
+  // Delete a contact
+  const handleDeleteContact = async (contactId: string, contactName: string) => {
+    if (!userId) {
+      Alert.alert("Error", "User not logged in. Cannot delete contact.")
+      return
+    }
+    Alert.alert(`Delete Contact`, `Remove ${contactName}?`, [
       { text: "Cancel", style: "cancel" },
       {
         text: "Delete",
         style: "destructive",
         onPress: async () => {
           try {
-            await fetch(`https://pregwell-backend.onrender.com/api/emergency_contacts/${userId}/${contactId}`, { method: "DELETE" })
-            fetchContacts()
-            Alert.alert("Deleted", `${contactName} removed.`)
+            const res = await fetch(
+              `https://pregwell-backend.onrender.com/api/emergency_contacts/${userId}/${contactId}`,
+              {
+                method: "DELETE",
+              },
+            )
+            if (res.ok) {
+              fetchContacts() // Refresh the list after deleting
+              Alert.alert("Deleted", `${contactName} removed.`)
+            } else {
+              Alert.alert("Error", "Failed to delete contact.")
+            }
           } catch (err) {
             Alert.alert("Error", "Failed to delete contact.")
           }
@@ -143,7 +181,8 @@ export default function EmergencyScreen() {
     ])
   }
 
-  const handleCall = (number) => {
+  // Place a phone call
+  const handleCall = (number: string) => {
     Alert.alert("Emergency Call", `Call ${number}?`, [
       { text: "Cancel", style: "cancel" },
       { text: "Call", style: "destructive", onPress: () => Linking.openURL(`tel:${number}`) },
@@ -152,20 +191,16 @@ export default function EmergencyScreen() {
 
   const findNearestHospitals = async () => {
     setLoading(true)
-
     try {
       if (!userLocation) {
         await getCurrentLocation()
       }
-
       if (userLocation) {
         // Open Google Maps with hospital search near user's location
         const { latitude, longitude } = userLocation
         const googleMapsUrl = `https://www.google.com/maps/search/hospitals+near+me/@${latitude},${longitude},15z`
-
         // For mobile apps, use the Google Maps app URL scheme
         const mobileUrl = `https://maps.google.com/?q=hospitals&ll=${latitude},${longitude}&z=15`
-
         const supported = await Linking.canOpenURL(mobileUrl)
         if (supported) {
           await Linking.openURL(mobileUrl)
@@ -187,27 +222,21 @@ export default function EmergencyScreen() {
 
   const shareLocation = async () => {
     setLocationLoading(true)
-
     try {
       let location = userLocation
       if (!location) {
-        const currentLocation = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High,
-        })
+        const currentLocation = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High })
         location = currentLocation.coords
         setUserLocation(location)
       }
-
       if (location) {
         const { latitude, longitude } = location
-        const locationMessage = `🚨 EMERGENCY LOCATION SHARE 🚨\n\nI need help! My current location is:\n\nLatitude: ${latitude.toFixed(6)}\nLongitude: ${longitude.toFixed(6)}\n\nGoogle Maps: https://maps.google.com/?q=${latitude},${longitude}\n\nPlease send help immediately!`
-
+        const locationMessage = `🚨 EMERGENCY LOCATION SHARE 🚨\n\nI need help! My current location is:\n\nLatitude: ${latitude.toFixed(
+          6,
+        )}\nLongitude: ${longitude.toFixed(6)}\n\nGoogle Maps: https://maps.google.com/?q=${latitude},${longitude}\n\nPlease send help immediately!`
         // Share via React Native's built-in Share API
         try {
-          await Share.share({
-            message: locationMessage,
-            title: "🚨 Emergency Location Share",
-          })
+          await Share.share({ message: locationMessage, title: "🚨 Emergency Location Share" })
         } catch (error) {
           console.log("Share error:", error)
           // Fallback: Show alert with options
@@ -228,7 +257,6 @@ export default function EmergencyScreen() {
             { text: "Close", style: "cancel" },
           ])
         }
-
         // Also send to emergency contacts if any exist
         if (emergencyContacts.length > 0) {
           Alert.alert(
@@ -251,7 +279,7 @@ export default function EmergencyScreen() {
     }
   }
 
-  const sendLocationToContacts = (locationMessage) => {
+  const sendLocationToContacts = (locationMessage: string) => {
     if (emergencyContacts.length > 0) {
       const phoneNumbers = emergencyContacts.map((contact) => contact.number).join(",")
       const smsUrl = `sms:${phoneNumbers}?body=${encodeURIComponent(locationMessage)}`
@@ -259,8 +287,8 @@ export default function EmergencyScreen() {
     }
   }
 
-  const handleQuickAction = (action) => {
-    const actions = {
+  const handleQuickAction = (action: string) => {
+    const actions: { [key: string]: () => void } = {
       emergency: () => handleCall("911"),
       hospital: findNearestHospitals,
       location: shareLocation,
@@ -463,7 +491,10 @@ export default function EmergencyScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FAFAFA" },
+  container: {
+    flex: 1,
+    backgroundColor: "#FAFAFA",
+  },
   header: {
     paddingTop: 50,
     paddingBottom: 25,
@@ -471,9 +502,22 @@ const s = StyleSheet.create({
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
   },
-  headerContent: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
-  headerTitle: { fontSize: 22, fontWeight: "bold", color: "white" },
-  headerSubtitle: { fontSize: 16, color: "rgba(255, 255, 255, 0.9)", textAlign: "center" },
+  headerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "white",
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: "rgba(255, 255, 255, 0.9)",
+    textAlign: "center",
+  },
   alertBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -483,7 +527,13 @@ const s = StyleSheet.create({
     padding: 15,
     borderRadius: 15,
   },
-  alertText: { color: "white", fontSize: 14, fontWeight: "600", marginLeft: 10, flex: 1 },
+  alertText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "600",
+    marginLeft: 10,
+    flex: 1,
+  },
   tabContainer: {
     flexDirection: "row",
     backgroundColor: "white",
@@ -500,14 +550,43 @@ const s = StyleSheet.create({
     marginHorizontal: 5,
     alignItems: "center",
   },
-  tabButtonActive: { backgroundColor: "#F44336" },
-  tabText: { fontSize: 14, fontWeight: "500", color: "#5D6D7E" },
-  tabTextActive: { color: "white" },
-  content: { flex: 1, padding: 20 },
-  sectionTitle: { fontSize: 20, fontWeight: "bold", color: "#2C3E50", marginBottom: 15 },
-  sectionSubtitle: { fontSize: 14, color: "#7F8C8D", marginBottom: 5 },
-  quickActionsGrid: { flexDirection: "row", justifyContent: "space-between", marginBottom: 25 },
-  quickActionCard: { width: "30%", borderRadius: 15, padding: 15, alignItems: "center" },
+  tabButtonActive: {
+    backgroundColor: "#F44336",
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#5D6D7E",
+  },
+  tabTextActive: {
+    color: "white",
+  },
+  content: {
+    flex: 1,
+    padding: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#2C3E50",
+    marginBottom: 15,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: "#7F8C8D",
+    marginBottom: 5,
+  },
+  quickActionsGrid: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 25,
+  },
+  quickActionCard: {
+    width: "30%",
+    borderRadius: 15,
+    padding: 15,
+    alignItems: "center",
+  },
   quickActionIcon: {
     width: 50,
     height: 50,
@@ -516,7 +595,12 @@ const s = StyleSheet.create({
     alignItems: "center",
     marginBottom: 8,
   },
-  quickActionTitle: { fontSize: 12, fontWeight: "bold", color: "#2C3E50", textAlign: "center" },
+  quickActionTitle: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: "#2C3E50",
+    textAlign: "center",
+  },
   hospitalSection: {
     backgroundColor: "#FFEBEE",
     borderRadius: 20,
@@ -524,9 +608,22 @@ const s = StyleSheet.create({
     alignItems: "center",
     marginBottom: 25,
   },
-  hospitalTitle: { fontSize: 20, fontWeight: "bold", color: "#2C3E50", marginTop: 10, marginBottom: 5 },
-  hospitalSubtitle: { fontSize: 14, color: "#7F8C8D", textAlign: "center", marginBottom: 20 },
-  findButton: { borderRadius: 25 },
+  hospitalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#2C3E50",
+    marginTop: 10,
+    marginBottom: 5,
+  },
+  hospitalSubtitle: {
+    fontSize: 14,
+    color: "#7F8C8D",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  findButton: {
+    borderRadius: 25,
+  },
   findButtonGradient: {
     flexDirection: "row",
     alignItems: "center",
@@ -535,18 +632,40 @@ const s = StyleSheet.create({
     paddingVertical: 15,
     borderRadius: 25,
   },
-  findButtonText: { color: "white", fontSize: 16, fontWeight: "bold", marginLeft: 10 },
+  findButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+    marginLeft: 10,
+  },
   locationSection: {
     backgroundColor: "#E8F5E8",
     borderRadius: 15,
     padding: 20,
     marginBottom: 25,
   },
-  locationInfo: { flexDirection: "row", alignItems: "center", marginBottom: 15 },
-  locationText: { marginLeft: 15, flex: 1 },
-  locationTitle: { fontSize: 16, fontWeight: "bold", color: "#2C3E50" },
-  locationSubtitle: { fontSize: 14, color: "#7F8C8D", marginTop: 2 },
-  shareLocationButton: { borderRadius: 12 },
+  locationInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  locationText: {
+    marginLeft: 15,
+    flex: 1,
+  },
+  locationTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#2C3E50",
+  },
+  locationSubtitle: {
+    fontSize: 14,
+    color: "#7F8C8D",
+    marginTop: 2,
+  },
+  shareLocationButton: {
+    borderRadius: 12,
+  },
   shareButtonGradient: {
     flexDirection: "row",
     alignItems: "center",
@@ -554,8 +673,18 @@ const s = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
   },
-  shareButtonText: { color: "white", fontSize: 14, fontWeight: "bold", marginLeft: 8 },
-  contactsHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 },
+  shareButtonText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "bold",
+    marginLeft: 8,
+  },
+  contactsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 20,
+  },
   formContainer: {
     marginBottom: 20,
     borderRadius: 20,
@@ -564,8 +693,17 @@ const s = StyleSheet.create({
     shadowRadius: 6,
     elevation: 4,
   },
-  formGradient: { borderRadius: 20, padding: 20 },
-  formTitle: { fontSize: 18, fontWeight: "bold", color: "#2C3E50", marginBottom: 15, textAlign: "center" },
+  formGradient: {
+    borderRadius: 20,
+    padding: 20,
+  },
+  formTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#2C3E50",
+    marginBottom: 15,
+    textAlign: "center",
+  },
   input: {
     borderColor: "#E0E0E0",
     borderWidth: 1,
@@ -575,12 +713,37 @@ const s = StyleSheet.create({
     fontSize: 16,
     backgroundColor: "white",
   },
-  formButtons: { flexDirection: "row", justifyContent: "space-between", marginTop: 10 },
-  cancelButton: { flex: 0.45, paddingVertical: 15, borderRadius: 12, backgroundColor: "#F5F5F5", alignItems: "center" },
-  cancelButtonText: { color: "#7F8C8D", fontSize: 16, fontWeight: "600" },
-  saveButton: { flex: 0.45, borderRadius: 12 },
-  saveButtonGradient: { paddingVertical: 15, borderRadius: 12, alignItems: "center" },
-  saveButtonText: { color: "white", fontSize: 16, fontWeight: "bold" },
+  formButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 10,
+  },
+  cancelButton: {
+    flex: 0.45,
+    paddingVertical: 15,
+    borderRadius: 12,
+    backgroundColor: "#F5F5F5",
+    alignItems: "center",
+  },
+  cancelButtonText: {
+    color: "#7F8C8D",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  saveButton: {
+    flex: 0.45,
+    borderRadius: 12,
+  },
+  saveButtonGradient: {
+    paddingVertical: 15,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  saveButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
   contactCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -602,14 +765,46 @@ const s = StyleSheet.create({
     marginRight: 15,
     backgroundColor: "#9C27B0",
   },
-  contactInfo: { flex: 1 },
-  contactName: { fontSize: 16, fontWeight: "bold", color: "#2C3E50" },
-  contactDescription: { fontSize: 12, color: "#7F8C8D", marginTop: 2 },
-  contactNumber: { fontSize: 14, color: "#5D6D7E", fontWeight: "600", marginTop: 4 },
-  contactActions: { flexDirection: "row", alignItems: "center", gap: 10 },
-  emptyState: { alignItems: "center", paddingVertical: 40 },
-  emptyTitle: { fontSize: 18, fontWeight: "bold", color: "#BDC3C7", marginTop: 15, marginBottom: 5 },
-  emptySubtitle: { fontSize: 14, color: "#BDC3C7", textAlign: "center" },
+  contactInfo: {
+    flex: 1,
+  },
+  contactName: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#2C3E50",
+  },
+  contactDescription: {
+    fontSize: 12,
+    color: "#7F8C8D",
+    marginTop: 2,
+  },
+  contactNumber: {
+    fontSize: 14,
+    color: "#5D6D7E",
+    fontWeight: "600",
+    marginTop: 4,
+  },
+  contactActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#BDC3C7",
+    marginTop: 15,
+    marginBottom: 5,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: "#BDC3C7",
+    textAlign: "center",
+  },
   fab: {
     position: "absolute",
     bottom: 20,
@@ -619,5 +814,11 @@ const s = StyleSheet.create({
     shadowRadius: 10,
     elevation: 8,
   },
-  fabGradient: { width: 64, height: 64, borderRadius: 32, justifyContent: "center", alignItems: "center" },
+  fabGradient: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: "center",
+    alignItems: "center",
+  },
 })
