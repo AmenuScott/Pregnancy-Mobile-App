@@ -1,14 +1,17 @@
-const express = require('express')
-const router = express.Router()
-const controller = require('../controllers/emergencyController')
+const express = require('express');
+const router = express.Router();
+const controller = require('../controllers/emergencyController');
 
-// POST a contact
-router.post('/:userId', controller.addContact)
+// ✅ POST: Add new contact
+router.post('/:userId', controller.addContact);
 
-// GET contacts
-router.get('/:userId', controller.getContacts)
+// ✅ GET: Get all contacts for user
+router.get('/:userId', controller.getContacts);
 
-// DELETE contact
-router.delete('/:userId/:contactId', controller.deleteContact)
+// ✅ DELETE: Remove contact by ID
+router.delete('/:userId/:contactId', controller.deleteContact);
 
-module.exports = router
+// ✅ PUT (Optional): Update contact
+router.put('/:userId/:contactId', controller.updateContact);
+
+module.exports = router;
