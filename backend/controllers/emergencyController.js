@@ -19,6 +19,24 @@ exports.addContact = async (req, res) => {
   }
 };
 
+// Get all contacts for a user
+const getContacts = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const result = await pool.query(
+      `SELECT id, contact_name AS name, contact_phone AS number, contact_relationship AS description
+       FROM emergency_contacts
+       WHERE user_id = $1
+       ORDER BY created_at DESC`,
+      [userId]
+    );
+    res.status(200).json({ contacts: result.rows });
+  } catch (err) {
+    console.error("Fetch Error:", err);
+    res.status(500).json({ error: 'Failed to fetch contacts' });
+  }
+};
+
 
 // Delete a contact
 exports.deleteContact = async (req, res) => {
@@ -47,3 +65,10 @@ exports.updateContact = async (req, res) => {
     res.status(500).json({ error: 'Failed to update contact' });
   }
 };
+
+module.exports = {
+  getContacts,
+  addContact,
+  deleteContact,
+  updateContact,
+}
