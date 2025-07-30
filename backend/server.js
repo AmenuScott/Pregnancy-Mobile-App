@@ -48,7 +48,7 @@ app.use("/api/setup", setupRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/", tipRoutes);
 app.use("/api/exercises", exerciseRoutes);
-app.use("/api/emergency", emergencyRoutes);
+app.use('/api/emergency_contacts', emergencyRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/health", healthRoutes);
 app.use("/api/", recoveryRoutes);
