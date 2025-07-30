@@ -1,34 +1,24 @@
 const pool = require('../db');
 
 // Get all contacts for a user
-exports.getContacts = async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const result = await pool.query(
-      'SELECT * FROM emergency_contacts WHERE user_id = $1 ORDER BY created_at DESC',
-      [userId]
-    );
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch contacts' });
-  }
-};
-
-// Add a contact
 exports.addContact = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { contact_name, contact_phone, contact_relationship } = req.body;
+    const { name, number, description } = req.body; // 👈 match frontend!
+
     const result = await pool.query(
       `INSERT INTO emergency_contacts (user_id, contact_name, contact_phone, contact_relationship)
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      [userId, contact_name, contact_phone, contact_relationship]
+      [userId, name, number, description]
     );
+
     res.status(201).json(result.rows[0]);
   } catch (err) {
+    console.error("Insert Error:", err); // helpful for debugging
     res.status(500).json({ error: 'Failed to add contact' });
   }
 };
+
 
 // Delete a contact
 exports.deleteContact = async (req, res) => {

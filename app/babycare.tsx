@@ -43,12 +43,20 @@ interface BabyNewsArticle {
   isLiked?: boolean
 }
 
+interface PersonalizedTip {
+  id: number
+  title: string
+  description: string
+  image_url: string
+  category: string
+}
+
 const BabyCareScreen = () => {
   const router = useRouter()
   const [selectedTab, setSelectedTab] = useState("newsFeed") // Changed default tab to 'newsFeed'
   const [babyDOB, setBabyDOB] = useState("")
-  const [babyAgeWeeks, setBabyAgeWeeks] = useState<number | null>(null)
   const [storedDOB, setStoredDOB] = useState("")
+  const [babyAgeWeeks, setBabyAgeWeeks] = useState<number | null>(null)
 
   // State for news feed
   const [newsArticles, setNewsArticles] = useState<BabyNewsArticle[]>([])
@@ -57,17 +65,26 @@ const BabyCareScreen = () => {
   const [showOptionsModal, setShowOptionsModal] = useState(false)
   const [selectedArticle, setSelectedArticle] = useState<BabyNewsArticle | null>(null)
 
+  // State for personalized tips
+  const [personalizedTips, setPersonalizedTips] = useState<PersonalizedTip[]>([])
+  const [loadingPersonalized, setLoadingPersonalized] = useState(true)
+  const [userId, setUserId] = useState<string | null>(null)
+
   // On mount, try to load stored birth date and fetch news articles
   useEffect(() => {
-    const loadDOB = async () => {
+    const loadData = async () => {
       const savedDOB = await AsyncStorage.getItem("babyDOB")
+      const savedUserId = await AsyncStorage.getItem("userId")
+      if (savedUserId) setUserId(savedUserId)
+
       if (savedDOB) {
         setStoredDOB(savedDOB)
         calculateAge(savedDOB)
+        if (savedUserId) fetchPersonalizedTips(savedUserId, savedDOB) // Pass DOB for personalized tips
       }
+      fetchNewsArticles() // Fetch news articles on component mount
     }
-    loadDOB()
-    fetchNewsArticles() // Fetch news articles on component mount
+    loadData()
   }, [])
 
   // Fetch news articles on component mount or refresh
@@ -160,6 +177,99 @@ const BabyCareScreen = () => {
     calculateAge(babyDOB)
     setBabyDOB("")
     Alert.alert("Success", "Baby's birth date saved!")
+    if (userId) fetchPersonalizedTips(userId, babyDOB) // Fetch personalized tips after saving DOB
+  }
+
+  const fetchPersonalizedTips = async (uid: string, dob: string) => {
+    if (!uid || !dob) return
+    setLoadingPersonalized(true)
+    try {
+      // Simulate fetching personalized tips based on baby's age
+      const birthDate = new Date(dob)
+      const today = new Date()
+      const ageInMs = today.getTime() - birthDate.getTime()
+      const ageInWeeks = Math.floor(ageInMs / (1000 * 60 * 60 * 24 * 7))
+
+      let tips: PersonalizedTip[] = []
+      if (ageInWeeks < 4) {
+        // 0-1 month
+        tips = [
+          {
+            id: 101,
+            title: "Newborn Feeding Cues",
+            description: "Recognize early hunger signs like rooting and lip smacking.",
+            image_url: "https://images.unsplash.com/photo-1586882828772-da400c587091?w=400&h=200&fit=crop&q=80",
+            category: "Feeding",
+          },
+          {
+            id: 102,
+            title: "Safe Sleep Practices",
+            description: "Always place your baby on their back to sleep in a crib free of loose bedding.",
+            image_url: "https://images.unsplash.com/photo-1512626128473-78d5579b6235?w=400&h=200&fit=crop&q=80",
+            category: "Sleep",
+          },
+        ]
+      } else if (ageInWeeks >= 4 && ageInWeeks < 12) {
+        // 1-3 months
+        tips = [
+          {
+            id: 103,
+            title: "Starting Tummy Time",
+            description: "Begin with short sessions of tummy time to strengthen neck and core muscles.",
+            image_url: "https://images.unsplash.com/photo-1586882828772-da400c587091?w=400&h=200&fit=crop&q=80",
+            category: "Development",
+          },
+          {
+            id: 104,
+            title: "Interacting with Your Baby",
+            description: "Engage with your baby through talking, singing, and making eye contact to foster bonding.",
+            image_url: "https://images.unsplash.com/photo-1512626128473-78d5579b6235?w=400&h=200&fit=crop&q=80",
+            category: "Bonding",
+          },
+        ]
+      } else if (ageInWeeks >= 12 && ageInWeeks < 24) {
+        // 3-6 months
+        tips = [
+          {
+            id: 105,
+            title: "Introducing Solid Foods",
+            description: "Look for signs of readiness before introducing pureed solids, usually around 4-6 months.",
+            image_url: "https://images.unsplash.com/photo-1512626128473-78d5579b6235?w=400&h=200&fit=crop&q=80",
+            category: "Feeding",
+          },
+          {
+            id: 106,
+            title: "Encouraging Rolling",
+            description: "Help your baby practice rolling from back to tummy and vice versa.",
+            image_url: "https://images.unsplash.com/photo-1586882828772-da400c587091?w=400&h=200&fit=crop&q=80",
+            category: "Development",
+          },
+        ]
+      } else {
+        // 6+ months
+        tips = [
+          {
+            id: 107,
+            title: "Baby-Led Weaning Basics",
+            description: "Explore introducing finger foods and allowing your baby to self-feed.",
+            image_url: "https://images.unsplash.com/photo-1512626128473-78d5579b6235?w=400&h=200&fit=crop&q=80",
+            category: "Feeding",
+          },
+          {
+            id: 108,
+            title: "Encouraging Crawling",
+            description: "Create a safe environment for your baby to explore and practice crawling.",
+            image_url: "https://images.unsplash.com/photo-1586882828772-da400c587091?w=400&h=200&fit=crop&q=80",
+            category: "Development",
+          },
+        ]
+      }
+      setPersonalizedTips(tips)
+    } catch (error) {
+      console.error("Error fetching personalized tips:", error)
+    } finally {
+      setLoadingPersonalized(false)
+    }
   }
 
   const handleLike = (articleId: number) => {
@@ -319,6 +429,19 @@ const BabyCareScreen = () => {
     </View>
   )
 
+  const renderPersonalizedTip = ({ item }: { item: PersonalizedTip }) => (
+    <View style={styles.personalizedTipCard}>
+      <LinearGradient colors={["#E0F7FA", "#B2EBF2"]} style={styles.personalizedTipGradient}>
+        <View style={styles.personalizedTipHeader}>
+          <Ionicons name="bulb-outline" size={20} color="#00ACC1" />
+          <Text style={styles.personalizedTipTitle}>{item.title}</Text>
+        </View>
+        <Text style={styles.personalizedTipDescription}>{item.description}</Text>
+        {item.image_url && <Image source={{ uri: item.image_url }} style={styles.personalizedTipImage} />}
+      </LinearGradient>
+    </View>
+  )
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#4ECDC4" />
@@ -346,26 +469,11 @@ const BabyCareScreen = () => {
       {/* Baby Stats Card */}
       <View style={styles.statsContainer}>
         <LinearGradient colors={["rgba(255,255,255,0.95)", "rgba(255,255,255,0.85)"]} style={styles.statsCard}>
-          <View style={styles.statItem}>
+          <View style={styles.singleStatItem}>
             <Ionicons name="baby-outline" size={24} color="#4ECDC4" />
-            <Text style={styles.statNumber}>{babyAgeWeeks !== null ? babyAgeWeeks : "--"}</Text>
-            <Text style={styles.statLabel}>Weeks Old</Text>
-          </View>
-
-          <View style={styles.statDivider} />
-
-          <View style={styles.statItem}>
-            <Ionicons name="scale-outline" size={24} color="#44A08D" />
-            <Text style={styles.statNumber}>5.2</Text>
-            <Text style={styles.statLabel}>kg Weight</Text>
-          </View>
-
-          <View style={styles.statDivider} />
-
-          <View style={styles.statItem}>
-            <Ionicons name="resize-outline" size={24} color="#4ECDC4" />
-            <Text style={styles.statNumber}>58</Text>
-            <Text style={styles.statLabel}>cm Length</Text>
+            <Text style={styles.singleStatText}>
+              Your Baby is: {babyAgeWeeks !== null ? `${babyAgeWeeks} week(s) old` : "--"}
+            </Text>
           </View>
         </LinearGradient>
       </View>
@@ -396,49 +504,50 @@ const BabyCareScreen = () => {
         </ScrollView>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {selectedTab === "newsFeed" && (
-          <View style={styles.newsFeedSection}>
-            <Text style={styles.sectionTitle}>Baby Care News</Text>
-            <Text style={styles.sectionSubtitle}>Latest articles and updates for new parents</Text>
+      {/* Conditional Content Rendering */}
+      {selectedTab === "newsFeed" && (
+        <View style={styles.newsFeedSection}>
+          <Text style={styles.sectionTitle}>Baby Care News</Text>
+          <Text style={styles.sectionSubtitle}>Latest articles and updates for new parents</Text>
 
-            {newsLoading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#4ECDC4" />
-                <Text style={styles.loadingText}>Loading news...</Text>
-              </View>
-            ) : (
-              <FlatList
-                data={newsArticles}
-                keyExtractor={(item) => item.id.toString()}
-                renderItem={renderNewsArticle}
-                contentContainerStyle={styles.newsFeedListContainer}
-                showsVerticalScrollIndicator={false}
-                refreshControl={
-                  <RefreshControl
-                    refreshing={newsRefreshing}
-                    onRefresh={onNewsRefresh}
-                    colors={["#4ECDC4"]}
-                    tintColor="#4ECDC4"
-                    progressBackgroundColor="#fff"
-                  />
-                }
-                ListEmptyComponent={
-                  <View style={styles.emptyState}>
-                    <View style={styles.emptyIcon}>
-                      <Ionicons name="newspaper-outline" size={64} color="#c7d2fe" />
-                    </View>
-                    <Text style={styles.emptyTitle}>No articles yet</Text>
-                    <Text style={styles.emptySubtitle}>Pull down to refresh your news feed</Text>
+          {newsLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#4ECDC4" />
+              <Text style={styles.loadingText}>Loading news...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={newsArticles}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={renderNewsArticle}
+              contentContainerStyle={styles.newsFeedListContainer}
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={newsRefreshing}
+                  onRefresh={onNewsRefresh}
+                  colors={["#4ECDC4"]}
+                  tintColor="#4ECDC4"
+                  progressBackgroundColor="#fff"
+                />
+              }
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <View style={styles.emptyIcon}>
+                    <Ionicons name="newspaper-outline" size={64} color="#c7d2fe" />
                   </View>
-                }
-              />
-            )}
-          </View>
-        )}
+                  <Text style={styles.emptyTitle}>No articles yet</Text>
+                  <Text style={styles.emptySubtitle}>Pull down to refresh your news feed</Text>
+                </View>
+              }
+            />
+          )}
+        </View>
+      )}
 
-        {selectedTab === "mybaby" && (
-          <View style={styles.myBabySection}>
+      {selectedTab === "mybaby" && (
+        <ScrollView style={styles.myBabyScrollView} showsVerticalScrollIndicator={false}>
+          <View style={styles.myBabySectionContent}>
             <Text style={styles.sectionTitle}>My Baby's Profile</Text>
             <Text style={styles.sectionSubtitle}>Manage your baby's key information</Text>
 
@@ -462,38 +571,62 @@ const BabyCareScreen = () => {
                 </LinearGradient>
               </View>
             ) : (
-              <View style={styles.infoCard}>
-                <LinearGradient colors={["#E0F7FA", "#B2EBF2"]} style={styles.infoGradient}>
-                  <View style={styles.infoItem}>
-                    <Ionicons name="calendar-outline" size={20} color="#00ACC1" />
-                    <Text style={styles.infoItemText}>Born on: {storedDOB}</Text>
+              <>
+                <View style={styles.infoCard}>
+                  <LinearGradient colors={["#E0F7FA", "#B2EBF2"]} style={styles.infoGradient}>
+                    <View style={styles.infoItem}>
+                      <Ionicons name="calendar-outline" size={20} color="#00ACC1" />
+                      <Text style={styles.infoItemText}>Born on: {storedDOB}</Text>
+                    </View>
+                    <View style={styles.infoItem}>
+                      <Ionicons name="baby-outline" size={20} color="#00ACC1" />
+                      <Text style={styles.infoItemText}>Your baby is {babyAgeWeeks} week(s) old</Text>
+                    </View>
+                    <View style={styles.infoItem}>
+                      <Ionicons name="medkit-outline" size={20} color="#00ACC1" />
+                      <Text style={styles.infoItemText}>Next vaccine: 10-week immunization</Text>
+                    </View>
+                    <View style={styles.infoItem}>
+                      <Ionicons name="sparkles-outline" size={20} color="#00ACC1" />
+                      <Text style={styles.infoItemText}>You're doing amazing! Keep it up 💖</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => setStoredDOB("")} style={styles.editButton}>
+                      <Ionicons name="pencil-outline" size={16} color="#00ACC1" />
+                      <Text style={styles.editButtonText}>Edit Birth Date</Text>
+                    </TouchableOpacity>
+                  </LinearGradient>
+                </View>
+
+                <Text style={styles.sectionTitle}>Personalized Tips</Text>
+                <Text style={styles.sectionSubtitle}>Tips tailored to your baby's age and development</Text>
+
+                {loadingPersonalized ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#4ECDC4" />
+                    <Text style={styles.loadingText}>Loading personalized tips...</Text>
                   </View>
-                  <View style={styles.infoItem}>
-                    <Ionicons name="baby-outline" size={20} color="#00ACC1" />
-                    <Text style={styles.infoItemText}>Your baby is {babyAgeWeeks} week(s) old</Text>
+                ) : personalizedTips.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <View style={styles.emptyIcon}>
+                      <Ionicons name="bulb-outline" size={64} color="#c7d2fe" />
+                    </View>
+                    <Text style={styles.emptyTitle}>No personalized tips yet</Text>
+                    <Text style={styles.emptySubtitle}>Enter your baby's birth date to get tailored advice!</Text>
                   </View>
-                  <View style={styles.infoItem}>
-                    <Ionicons name="medkit-outline" size={20} color="#00ACC1" />
-                    <Text style={styles.infoItemText}>Next vaccine: 10-week immunization</Text>
+                ) : (
+                  <View style={styles.personalizedTipsListContainer}>
+                    {personalizedTips.map((tip: PersonalizedTip) => (
+                      <View key={tip.id.toString()} style={styles.personalizedTipCard}>
+                        {renderPersonalizedTip({ item: tip })}
+                      </View>
+                    ))}
                   </View>
-                  <View style={styles.infoItem}>
-                    <Ionicons name="bulb-outline" size={20} color="#00ACC1" />
-                    <Text style={styles.infoItemText}>Personalized Tip: Introduce short tummy time daily</Text>
-                  </View>
-                  <View style={styles.infoItem}>
-                    <Ionicons name="sparkles-outline" size={20} color="#00ACC1" />
-                    <Text style={styles.infoItemText}>You're doing amazing! Keep it up 💖</Text>
-                  </View>
-                  <TouchableOpacity onPress={() => setStoredDOB("")} style={styles.editButton}>
-                    <Ionicons name="pencil-outline" size={16} color="#00ACC1" />
-                    <Text style={styles.editButtonText}>Edit Birth Date</Text>
-                  </TouchableOpacity>
-                </LinearGradient>
-              </View>
+                )}
+              </>
             )}
           </View>
-        )}
-      </ScrollView>
+        </ScrollView>
+      )}
 
       {/* Options Modal for Android */}
       <Modal
@@ -583,7 +716,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   statsCard: {
-    flexDirection: "row",
+    flexDirection: "row", // Keep as row for potential future expansion, but only one item now
     borderRadius: 20,
     padding: 20,
     shadowColor: "#000",
@@ -595,26 +728,18 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  statItem: {
-    flex: 1,
-    alignItems: "center",
+  // Removed statItem, statNumber, statLabel, statDivider
+  singleStatItem: {
+    flex: 1, // Take full width
+    alignItems: "center", // Center content horizontally
+    justifyContent: "center", // Center content vertically
+    flexDirection: "row", // Arrange icon and text in a row
   },
-  statNumber: {
+  singleStatText: {
     fontSize: 20,
     fontWeight: "700",
     color: "#2d3748",
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: "#718096",
-    fontWeight: "500",
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: "#e2e8f0",
-    marginHorizontal: 15,
+    marginLeft: 10, // Space between icon and text
   },
   tabContainer: {
     backgroundColor: "white",
@@ -648,29 +773,29 @@ const styles = StyleSheet.create({
   tabButtonTextActive: {
     color: "white",
   },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
   sectionTitle: {
     fontSize: 20,
     fontWeight: "bold",
     color: "#2C3E50",
     marginBottom: 5,
+    paddingHorizontal: 20, // Added padding for consistency
   },
   sectionSubtitle: {
     fontSize: 14,
     color: "#7F8C8D",
     marginBottom: 20,
+    paddingHorizontal: 20, // Added padding for consistency
   },
   newsFeedSection: {
+    flex: 1, // Allow FlatList to take available space
     marginBottom: 20,
   },
-  myBabySection: {
-    marginBottom: 20,
+  myBabySectionContent: {
+    paddingBottom: 20, // Add bottom padding for content within the scroll view
   },
   newsFeedListContainer: {
     paddingBottom: 20,
+    paddingHorizontal: 20, // Added padding here for news feed items
   },
   newsFeedItem: {
     backgroundColor: "#fff",
@@ -902,6 +1027,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
+    marginBottom: 20, // Added margin for spacing
   },
   infoGradient: {
     borderRadius: 15,
@@ -1002,5 +1128,51 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     marginLeft: 5,
+  },
+  personalizedTipsListContainer: {
+    paddingBottom: 20,
+  },
+  personalizedTipCard: {
+    borderRadius: 15,
+    marginBottom: 15,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  personalizedTipGradient: {
+    borderRadius: 15,
+    padding: 20,
+  },
+  personalizedTipHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  personalizedTipTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#00ACC1",
+    marginLeft: 8,
+  },
+  personalizedTipDescription: {
+    fontSize: 14,
+    color: "#5D6D7E",
+    lineHeight: 20,
+    marginBottom: 10,
+  },
+  personalizedTipImage: {
+    width: "100%",
+    height: 150,
+    borderRadius: 10,
+    resizeMode: "cover",
+    marginTop: 10,
+  },
+  myBabyScrollView: {
+    flex: 1,
+    paddingHorizontal: 20, // Apply padding here
+  },
+  myBabySectionContent: {
+    paddingBottom: 20, // Add bottom padding for content within the scroll view
   },
 })
