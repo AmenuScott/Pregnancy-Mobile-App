@@ -178,3 +178,16 @@ exports.getAllPatients = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch patients" });
   }
 };
+
+exports.getProfile = async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const result = await pool.query(
+      "SELECT trimester, due_date FROM pregnancy_profiles WHERE user_id = $1",
+      [userId]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
