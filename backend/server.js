@@ -14,7 +14,7 @@ const patientRoutes = require("./routes/patientRoutes");
 const setupRoutes = require("./routes/setupRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const tipRoutes = require("./routes/tipRoutes");
-const exerciseRoutes = require("./routes/exerciseRoutes");
+const exercisesRoutes = require("./routes/exercisesRoutes")
 const emergencyRoutes = require("./routes/emergencyRoutes");
 const messageRoutes = require("./routes/messagesRoutes");
 const healthRoutes = require("./routes/healthRoutes");
@@ -47,7 +47,7 @@ app.use("/api/", patientRoutes);
 app.use("/api/setup", setupRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/", tipRoutes);
-app.use("/api/exercises", exerciseRoutes);
+app.use(exercisesRoutes)
 app.use('/api/emergency_contacts', emergencyRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/health", healthRoutes);
