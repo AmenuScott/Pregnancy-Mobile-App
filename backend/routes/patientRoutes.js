@@ -18,6 +18,5 @@ router.get('/profile/:userId', patientController.getProfile);
 // Fetch all patients (for NewChats screen)
 router.get('/patients', patientController.getAllPatients);
 
-router.get("/api/pregnancy-profile/:userId", patientController.getProfile);
 
 module.exports = router;
