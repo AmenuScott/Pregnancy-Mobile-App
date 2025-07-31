@@ -1,216 +1,596 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect, useState } from "react";
+"use client"
+
+import { Ionicons } from "@expo/vector-icons"
+import AsyncStorage from "@react-native-async-storage/async-storage"
+import { LinearGradient } from "expo-linear-gradient"
+import { useRouter } from "expo-router"
+import { useCallback, useEffect, useState } from "react"
 import {
   ActivityIndicator,
+  Alert,
+  Dimensions,
   Image,
+  Platform,
+  SafeAreaView,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
-} from "react-native";
+} from "react-native"
+
+const { width } = Dimensions.get("window")
+const statusBarHeight = Platform.OS === "ios" ? 44 : StatusBar.currentHeight || 24
+
+interface Food {
+  name: string
+  category: string
+  benefit: string
+}
+
+interface Meal {
+  title: string
+  type: string
+  image_url?: string
+  items: string[]
+  instructions: string
+}
+
+interface AvoidItem {
+  name: string
+  reason: string
+}
+
+interface NutritionTip {
+  tip: string
+}
 
 const DietScreen = () => {
-  const [userId, setUserId] = useState("");
-  const [trimester, setTrimester] = useState(1);
-  const [foods, setFoods] = useState([]);
-  const [meals, setMeals] = useState([]);
-  const [avoid, setAvoid] = useState([]);
-  const [tips, setTips] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null)
+  const [trimester, setTrimester] = useState(1)
+  const [foods, setFoods] = useState<Food[]>([])
+  const [meals, setMeals] = useState<Meal[]>([])
+  const [avoid, setAvoid] = useState<AvoidItem[]>([])
+  const [tips, setTips] = useState<NutritionTip[]>([])
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
+  const [currentTime, setCurrentTime] = useState(new Date())
 
   useEffect(() => {
-const fetchAll = async () => {
-  try {
-    const id = await AsyncStorage.getItem("userId");
-    setUserId(id || "");
+    const timer = setInterval(() => {
+      setCurrentTime(new Date())
+    }, 60000) // Update time every minute for greeting
 
-    const profileRes = await fetch(
-      `https://pregwell-backend.onrender.com/api/pregnancy-profile/${id}`
-    );
-    const profileText = await profileRes.text();
-    console.log("PROFILE RESPONSE:", profileText);
+    return () => clearInterval(timer)
+  }, [])
 
-    const profile = JSON.parse(profileText); // manually parse
-    setTrimester(profile.trimester || 1);
-
-    const [fRes, mRes, aRes, tRes] = await Promise.all([
-      fetch(`https://pregwell-backend.onrender.com/api/recommended-foods/${profile.trimester}`),
-      fetch(`https://pregwell-backend.onrender.com/api/meal-ideas/${profile.trimester}`),
-      fetch("https://pregwell-backend.onrender.com/api/foods-to-avoid"),
-      fetch("https://pregwell-backend.onrender.com/api/nutrition-tips"),
-    ]);
-
-    // log each response before parsing
-    const fText = await fRes.text();
-    const mText = await mRes.text();
-    const aText = await aRes.text();
-    const tText = await tRes.text();
-
-    console.log("RECOMMENDED FOODS:", fText);
-    console.log("MEAL IDEAS:", mText);
-    console.log("FOODS TO AVOID:", aText);
-    console.log("TIPS:", tText);
-
-    // convert to JSON after verifying it's not HTML
-    const fData = JSON.parse(fText);
-    const mData = JSON.parse(mText);
-    const aData = JSON.parse(aText);
-    const tData = JSON.parse(tText);
-
-    setFoods(fData);
-    setMeals(mData);
-    setAvoid(aData);
-    setTips(tData);
-    setLoading(false);
-  } catch (err) {
-    console.error("Error fetching diet data:", err);
-    setLoading(false);
+  const getGreeting = () => {
+    const hour = currentTime.getHours()
+    if (hour < 12) return "Good Morning"
+    if (hour < 17) return "Good Afternoon"
+    return "Good Evening"
   }
-};
 
+  const fetchAllData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const id = await AsyncStorage.getItem("userId")
+      setUserId(id)
 
-    fetchAll();
-  }, []);
+      if (!id) {
+        Alert.alert("Error", "User ID not found. Please log in again.")
+        setLoading(false)
+        return
+      }
+
+      const profileRes = await fetch(`https://pregwell-backend.onrender.com/api/patients/${id}`)
+      if (!profileRes.ok) {
+        throw new Error(`Failed to fetch profile: ${profileRes.status}`)
+      }
+      const profile = await profileRes.json()
+      setTrimester(profile.trimester || 1)
+
+      const [fRes, mRes, aRes, tRes] = await Promise.all([
+        fetch(`https://pregwell-backend.onrender.com/api/recommended-foods/${profile.trimester}`),
+        fetch(`https://pregwell-backend.onrender.com/api/meal-ideas/${profile.trimester}`),
+        fetch("https://pregwell-backend.onrender.com/api/foods-to-avoid"),
+        fetch("https://pregwell-backend.onrender.com/api/nutrition-tips"),
+      ])
+
+      const fData = await fRes.json()
+      const mData = await mRes.json()
+      const aData = await aRes.json()
+      const tData = await tRes.json()
+
+      setFoods(fData)
+      setMeals(mData)
+      setAvoid(aData)
+      setTips(tData)
+    } catch (err: any) {
+      console.error("Error fetching diet data:", err)
+      Alert.alert("Error", `Failed to load diet data: ${err.message || "Unknown error"}`)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchAllData()
+  }, [fetchAllData])
 
   if (loading) {
     return (
-      <View style={styles.loading}>
-        <ActivityIndicator size="large" color="#a36fff" />
+      <View style={styles.loadingContainer}>
+        <StatusBar barStyle="light-content" backgroundColor="#A36AC3" />
+        <LinearGradient colors={["#A36AC3", "#C672E5"]} style={styles.loadingGradient}>
+          <View style={styles.loadingContent}>
+            <View style={styles.loadingSpinner}>
+              <ActivityIndicator size="large" color="#fff" />
+            </View>
+            <Text style={styles.loadingText}>Loading your personalized diet plan...</Text>
+          </View>
+        </LinearGradient>
       </View>
-    );
+    )
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <LinearGradient colors={["#a36fff", "#e0b3ff"]} style={styles.header}>
-        <Text style={styles.headerText}>My Nutrition</Text>
-        <Text style={styles.subHeader}>Trimester {trimester}</Text>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#A36AC3" />
+
+      {/* Modern Header with Gradient */}
+      <LinearGradient colors={["#A36AC3", "#C672E5"]} style={styles.header} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.headerContent}>
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+              <Ionicons name="chevron-back" size={24} color="white" />
+            </TouchableOpacity>
+
+            <View style={styles.headerCenter}>
+              <Text style={styles.headerTitle}>{getGreeting()}</Text>
+              <View style={styles.headerBadge}>
+                <Ionicons name="nutrition-outline" size={12} color="#A36AC3" />
+                <Text style={styles.headerBadgeText}>Trimester {trimester}</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity style={styles.refreshButton} onPress={fetchAllData}>
+              <Ionicons name="refresh-outline" size={22} color="white" />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.headerSubtitle}>Your personalized nutrition guide</Text>
+        </SafeAreaView>
       </LinearGradient>
 
-      {/* Recommended Foods */}
-      <Text style={styles.sectionTitle}>✅ Recommended Foods</Text>
-      {foods.map((food, index) => (
-        <View key={index} style={styles.card}>
-          <Text style={styles.cardTitle}>{food.name}</Text>
-          <Text style={styles.cardSubtitle}>{food.category}</Text>
-          <Text style={styles.cardDesc}>{food.benefit}</Text>
-        </View>
-      ))}
-
-      {/* Meal Ideas */}
-      <Text style={styles.sectionTitle}>🍽️ Meal Ideas</Text>
-      {meals.map((meal, index) => (
-        <View key={index} style={styles.card}>
-          <Text style={styles.cardTitle}>{meal.title} ({meal.type})</Text>
-          {meal.image_url && (
-            <Image source={{ uri: meal.image_url }} style={styles.mealImage} />
+      <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
+        {/* Recommended Foods */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            <Ionicons name="checkmark-circle-outline" size={20} color="#4CAF50" /> Recommended Foods
+          </Text>
+          <Text style={styles.sectionSubtitle}>Nutrient-rich foods for a healthy pregnancy</Text>
+          {foods.length > 0 ? (
+            foods.map((food, index) => (
+              <View key={index} style={styles.card}>
+                <View style={styles.cardIconContainer}>
+                  <Ionicons name="leaf-outline" size={24} color="#4CAF50" />
+                </View>
+                <View style={styles.cardTextContent}>
+                  <Text style={styles.cardTitle}>{food.name}</Text>
+                  <Text style={styles.cardSubtitle}>{food.category}</Text>
+                  <Text style={styles.cardDesc}>{food.benefit}</Text>
+                </View>
+              </View>
+            ))
+          ) : (
+            <View style={styles.emptyStateCard}>
+              <Ionicons name="sad-outline" size={40} color="#D1C4E9" />
+              <Text style={styles.emptyTitleSmall}>No recommended foods found.</Text>
+              <Text style={styles.emptySubtitleSmall}>Check back later for updates!</Text>
+            </View>
           )}
-          <Text style={styles.cardSubtitle}>Ingredients: {meal.items.join(", ")}</Text>
-          <Text style={styles.cardDesc}>Instructions: {meal.instructions}</Text>
         </View>
-      ))}
 
-      {/* Foods to Avoid */}
-      <Text style={styles.sectionTitle}>🚫 Foods to Avoid</Text>
-      {avoid.map((item, index) => (
-        <View key={index} style={styles.cardRed}>
-          <Text style={styles.cardTitle}>{item.name}</Text>
-          <Text style={styles.cardDesc}>{item.reason}</Text>
+        {/* Meal Ideas */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            <Ionicons name="restaurant-outline" size={20} color="#FF9800" /> Meal Ideas
+          </Text>
+          <Text style={styles.sectionSubtitle}>Delicious and easy recipes for your trimester</Text>
+          {meals.length > 0 ? (
+            meals.map((meal, index) => (
+              <View key={index} style={styles.mealCard}>
+                {meal.image_url && (
+                  <Image
+                    source={{ uri: meal.image_url || "/placeholder.svg?height=160&width=400" }}
+                    style={styles.mealImage}
+                  />
+                )}
+                <View style={styles.mealContent}>
+                  <Text style={styles.mealTitle}>{meal.title}</Text>
+                  <Text style={styles.mealType}>{meal.type}</Text>
+                  <Text style={styles.mealIngredients}>
+                    <Text style={{ fontWeight: "bold" }}>Ingredients:</Text> {meal.items.join(", ")}
+                  </Text>
+                  <Text style={styles.mealInstructions}>
+                    <Text style={{ fontWeight: "bold" }}>Instructions:</Text> {meal.instructions}
+                  </Text>
+                  <TouchableOpacity style={styles.viewRecipeButton}>
+                    <Ionicons name="book-outline" size={16} color="#C672E5" />
+                    <Text style={styles.viewRecipeButtonText}>View Full Recipe</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))
+          ) : (
+            <View style={styles.emptyStateCard}>
+              <Ionicons name="sad-outline" size={40} color="#D1C4E9" />
+              <Text style={styles.emptyTitleSmall}>No meal ideas found.</Text>
+              <Text style={styles.emptySubtitleSmall}>Check back later for new recipes!</Text>
+            </View>
+          )}
         </View>
-      ))}
 
-      {/* Nutrition Tips */}
-      <Text style={styles.sectionTitle}>📚 Nutrition Tips</Text>
-      {tips.map((tip, index) => (
-        <View key={index} style={styles.cardTip}>
-          <Text style={styles.cardDesc}>• {tip.tip}</Text>
+        {/* Foods to Avoid */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            <Ionicons name="warning-outline" size={20} color="#EF4444" /> Foods to Avoid
+          </Text>
+          <Text style={styles.sectionSubtitle}>Important foods to limit or avoid during pregnancy</Text>
+          {avoid.length > 0 ? (
+            avoid.map((item, index) => (
+              <View key={index} style={styles.avoidCard}>
+                <View style={styles.avoidIconContainer}>
+                  <Ionicons name="close-circle-outline" size={24} color="#EF4444" />
+                </View>
+                <View style={styles.avoidTextContent}>
+                  <Text style={styles.avoidTitle}>{item.name}</Text>
+                  <Text style={styles.avoidReason}>{item.reason}</Text>
+                </View>
+              </View>
+            ))
+          ) : (
+            <View style={styles.emptyStateCard}>
+              <Ionicons name="happy-outline" size={40} color="#D1C4E9" />
+              <Text style={styles.emptyTitleSmall}>No specific foods to avoid listed.</Text>
+              <Text style={styles.emptySubtitleSmall}>Always consult your doctor for personalized advice.</Text>
+            </View>
+          )}
         </View>
-      ))}
-    </ScrollView>
-  );
-};
 
-export default DietScreen;
+        {/* Nutrition Tips */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            <Ionicons name="bulb-outline" size={20} color="#2196F3" /> Nutrition Tips
+          </Text>
+          <Text style={styles.sectionSubtitle}>Helpful advice for a balanced diet</Text>
+          {tips.length > 0 ? (
+            tips.map((tip, index) => (
+              <View key={index} style={styles.tipCard}>
+                <Ionicons name="star-outline" size={18} color="#2196F3" style={styles.tipBulletIcon} />
+                <Text style={styles.tipText}>{tip.tip}</Text>
+              </View>
+            ))
+          ) : (
+            <View style={styles.emptyStateCard}>
+              <Ionicons name="sad-outline" size={40} color="#D1C4E9" />
+              <Text style={styles.emptyTitleSmall}>No nutrition tips found.</Text>
+              <Text style={styles.emptySubtitleSmall}>Stay tuned for more helpful advice!</Text>
+            </View>
+          )}
+        </View>
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </View>
+  )
+}
+
+export default DietScreen
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#faf5ff",
+    backgroundColor: "#FDF7FF", // Light purple background
   },
-  loading: {
+  safeArea: {
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
+  },
+  loadingContainer: {
+    flex: 1,
+  },
+  loadingGradient: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
+  loadingContent: {
+    alignItems: "center",
+  },
+  loadingSpinner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  loadingText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
   header: {
     padding: 20,
-    borderBottomLeftRadius: 25,
-    borderBottomRightRadius: 25,
+    paddingTop: statusBarHeight + 10,
+    paddingBottom: 25,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  headerText: {
+  headerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 15,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: "center",
+  },
+  headerTitle: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#fff",
+    color: "white",
+    marginBottom: 4,
   },
-  subHeader: {
+  headerBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.9)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 15,
+  },
+  headerBadgeText: {
+    fontSize: 12,
+    color: "#A36AC3",
+    fontWeight: "600",
+    marginLeft: 5,
+  },
+  refreshButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerSubtitle: {
     fontSize: 16,
-    color: "#f5e6ff",
-    marginTop: 4,
+    color: "rgba(255, 255, 255, 0.9)",
+    marginTop: 5,
+    textAlign: "center",
+  },
+  contentScrollView: {
+    flex: 1,
+    paddingTop: 10,
+  },
+  section: {
+    marginTop: 25,
+    paddingHorizontal: 20,
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: "600",
-    marginHorizontal: 16,
-    marginTop: 24,
-    marginBottom: 8,
-    color: "#5e3a8c",
+    fontWeight: "bold",
+    color: "#4B2354",
+    marginBottom: 5,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: "#6D4B75",
+    marginBottom: 15,
   },
   card: {
-    backgroundColor: "#fff",
-    marginHorizontal: 16,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
     marginBottom: 12,
-    padding: 14,
-    borderRadius: 14,
-    shadowColor: "#a36fff",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 3,
+    padding: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 5,
   },
-  cardRed: {
-    backgroundColor: "#ffe6e6",
-    marginHorizontal: 16,
-    marginBottom: 12,
-    padding: 14,
-    borderRadius: 14,
+  cardIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#E8F5E9", // Light green for recommended foods
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 15,
   },
-  cardTip: {
-    backgroundColor: "#f3e7ff",
-    marginHorizontal: 16,
-    marginBottom: 10,
-    padding: 12,
-    borderRadius: 10,
+  cardTextContent: {
+    flex: 1,
   },
   cardTitle: {
     fontSize: 16,
     fontWeight: "bold",
+    color: "#4B2354",
     marginBottom: 4,
   },
   cardSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontStyle: "italic",
-    color: "#777",
+    color: "#977A9C",
     marginBottom: 4,
   },
   cardDesc: {
     fontSize: 14,
-    color: "#444",
+    color: "#6D4B75",
+    lineHeight: 20,
+  },
+  mealCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    marginBottom: 12,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 5,
   },
   mealImage: {
     width: "100%",
-    height: 160,
-    borderRadius: 10,
-    marginVertical: 8,
+    height: 180,
+    resizeMode: "cover",
   },
-});
+  mealContent: {
+    padding: 15,
+  },
+  mealTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#4B2354",
+    marginBottom: 5,
+  },
+  mealType: {
+    fontSize: 14,
+    color: "#FF9800",
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  mealIngredients: {
+    fontSize: 14,
+    color: "#6D4B75",
+    marginBottom: 8,
+    lineHeight: 20,
+  },
+  mealInstructions: {
+    fontSize: 14,
+    color: "#6D4B75",
+    lineHeight: 20,
+    marginBottom: 15,
+  },
+  viewRecipeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F3E5F5",
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#C672E5",
+  },
+  viewRecipeButtonText: {
+    color: "#C672E5",
+    fontSize: 16,
+    fontWeight: "bold",
+    marginLeft: 8,
+  },
+  avoidCard: {
+    backgroundColor: "#FFEBEE", // Light red for foods to avoid
+    borderRadius: 16,
+    marginBottom: 12,
+    padding: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  avoidIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#FFCDD2", // Slightly darker red for icon background
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 15,
+  },
+  avoidTextContent: {
+    flex: 1,
+  },
+  avoidTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#D32F2F", // Darker red for title
+    marginBottom: 4,
+  },
+  avoidReason: {
+    fontSize: 14,
+    color: "#EF4444", // Red for reason
+    lineHeight: 20,
+  },
+  tipCard: {
+    backgroundColor: "#E3F2FD", // Light blue for tips
+    borderRadius: 12,
+    marginBottom: 10,
+    padding: 15,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  tipBulletIcon: {
+    marginRight: 10,
+    marginTop: 2,
+  },
+  tipText: {
+    flex: 1,
+    fontSize: 14,
+    color: "#2196F3", // Blue for tip text
+    lineHeight: 20,
+  },
+  emptyStateCard: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+    elevation: 3,
+    minHeight: 150,
+  },
+  emptyTitleSmall: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#4B2354",
+    marginTop: 10,
+    marginBottom: 5,
+    textAlign: "center",
+  },
+  emptySubtitleSmall: {
+    fontSize: 13,
+    color: "#6D4B75",
+    textAlign: "center",
+    lineHeight: 18,
+  },
+})
