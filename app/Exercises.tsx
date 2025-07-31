@@ -11,7 +11,15 @@ const ExerciseScreen = () => {
     console.log("OpenAI Key:", openaiKey)
     if (!openaiKey) return
 
-    const prompt = `Generate 1 safe prenatal exercise for a pregnant woman in her second trimester. Include: name, description, duration, category, and image. Return JSON.`
+    const prompt = `Return ONE prenatal exercise for a pregnant woman in her second trimester as raw JSON only. Do not include any explanation or markdown. Format:
+
+    {
+      "name": "Exercise name",
+      "description": "Short description",
+      "duration": "10 minutes",
+      "category": "Stretching",
+      "image": "https://..."
+    }`
 
     try {
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -31,10 +39,22 @@ const ExerciseScreen = () => {
       })
 
       const data = await response.json()
+      console.log("Full GPT response:", JSON.stringify(data, null, 2))
+
       const content = data?.choices?.[0]?.message?.content
-      console.log("GPT Response Content:", content)
-      const parsed = JSON.parse(content)
-      setFeatured(parsed)
+      if (!content) {
+        console.error("No GPT content received")
+        return
+      }
+
+      console.log("GPT Raw Content:", content)
+
+      try {
+        const parsed = JSON.parse(content)
+        setFeatured(parsed)
+      } catch (err) {
+        console.error("Failed to parse GPT response:", err)
+      }
     } catch (error) {
       console.error("Error fetching GPT exercise:", error)
     }
