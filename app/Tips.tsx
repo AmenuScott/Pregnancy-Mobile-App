@@ -47,6 +47,14 @@ const HealthTips = () => {
   const [selectedTip, setSelectedTip] = useState<HealthTip | null>(null)
   const router = useRouter()
 
+  
+  function getRandomSubset(tips: HealthTip[], min: number = 5, max: number = 10): HealthTip[] {
+  const shuffled = [...tips].sort(() => 0.5 - Math.random())
+  const count = Math.floor(Math.random() * (max - min + 1)) + min
+  return shuffled.slice(0, count)
+}
+
+
   useEffect(() => {
     const fetchUserData = async () => {
       try {
@@ -334,7 +342,11 @@ const HealthTips = () => {
             {/* Article Image */}
             <TouchableOpacity
               style={styles.imageContainer}
-              onPress={() => Linking.openURL(item.link)}
+              onPress={() => {
+  const url = item.link?.startsWith("http") ? item.link : `https://${item.link}`
+  Linking.openURL(url)
+}}
+
               activeOpacity={0.95}
             >
               <Image
@@ -356,7 +368,11 @@ const HealthTips = () => {
             <View style={styles.articleActions}>
               <TouchableOpacity
                 style={styles.actionButton}
-                onPress={() => Linking.openURL(item.link)}
+                onPress={() => {
+  const url = item.link?.startsWith("http") ? item.link : `https://${item.link}`
+  Linking.openURL(url)
+}}
+
                 activeOpacity={0.8}
               >
                 <LinearGradient colors={["#667eea", "#764ba2"]} style={styles.readButton}>

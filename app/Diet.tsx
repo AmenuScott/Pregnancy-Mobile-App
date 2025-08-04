@@ -3,6 +3,7 @@
 import { Ionicons } from "@expo/vector-icons"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { LinearGradient } from "expo-linear-gradient"
+import * as Linking from "expo-linking"
 import { useRouter } from "expo-router"
 import { useCallback, useEffect, useState } from "react"
 import {
@@ -19,6 +20,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native"
+
 
 const { width } = Dimensions.get("window")
 const statusBarHeight = Platform.OS === "ios" ? 44 : StatusBar.currentHeight || 24
@@ -46,6 +48,22 @@ interface NutritionTip {
   tip: string
 }
 
+const getRandomItems = (array: any[], count: number) => {
+  const shuffled = [...array].sort(() => 0.5 - Math.random())
+  return shuffled.slice(0, count)
+}
+
+
+const calculateTrimester = (lmpDate: string) => {
+  const now = new Date()
+  const lmp = new Date(lmpDate)
+  const diffInWeeks = Math.floor((now.getTime() - lmp.getTime()) / (1000 * 60 * 60 * 24 * 7))
+
+  if (diffInWeeks < 13) return 1
+  if (diffInWeeks < 27) return 2
+  return 3
+}
+
 const DietScreen = () => {
   const [userId, setUserId] = useState<string | null>(null)
   const [trimester, setTrimester] = useState(1)
@@ -56,6 +74,11 @@ const DietScreen = () => {
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const [currentTime, setCurrentTime] = useState(new Date())
+  const [dailyFoods, setDailyFoods] = useState<Food[]>([])
+  const [dailyAvoid, setDailyAvoid] = useState<AvoidItem[]>([])
+  const [dailyTips, setDailyTips] = useState<NutritionTip[]>([])
+
+
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -72,48 +95,91 @@ const DietScreen = () => {
     return "Good Evening"
   }
 
-  const fetchAllData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const id = await AsyncStorage.getItem("userId")
-      setUserId(id)
+const fetchAllData = useCallback(async () => {
+  setLoading(true)
+  try {
+    const id = await AsyncStorage.getItem("userId")
+    setUserId(id)
 
-      if (!id) {
-        Alert.alert("Error", "User ID not found. Please log in again.")
-        setLoading(false)
+    if (!id) {
+      Alert.alert("Error", "User ID not found. Please log in again.")
+      setLoading(false)
+      return
+    }
+
+    const profileRes = await fetch(`https://pregwell-backend.onrender.com/api/profile/${id}`)
+    if (!profileRes.ok) {
+      throw new Error(`Failed to fetch profile: ${profileRes.status}`)
+    }
+    const profile = await profileRes.json()
+
+    const trimesterCalculated = calculateTrimester(profile.last_menstrual_period)
+    setTrimester(trimesterCalculated)
+
+    const [fRes, mRes, aRes, tRes] = await Promise.all([
+      fetch(`https://pregwell-backend.onrender.com/api/recommended-foods/${trimesterCalculated}`),
+      fetch(`https://pregwell-backend.onrender.com/api/meal-ideas/${trimesterCalculated}`),
+      fetch("https://pregwell-backend.onrender.com/api/foods-to-avoid"),
+      fetch("https://pregwell-backend.onrender.com/api/nutrition-tips"),
+    ])
+
+    const fData = await fRes.json()
+    const mData = await mRes.json()
+    const aData = await aRes.json()
+    const tData = await tRes.json()
+    await loadDailyPicks(fData, aData, tData)
+
+    setFoods(fData)
+    setMeals(mData)
+    setAvoid(aData)
+    setTips(tData)
+    setFoods(fData)
+    setMeals(mData)
+    setAvoid(aData)
+    setTips(tData)
+  } catch (err: any) {
+    console.error("Error fetching diet data:", err)
+    Alert.alert("Error", `Failed to load diet data: ${err.message || "Unknown error"}`)
+  } finally {
+    setLoading(false)
+  }
+}, [])
+
+const loadDailyPicks = async (foods: Food[], avoid: AvoidItem[], tips: NutritionTip[]) => {
+  try {
+    const timestamp = await AsyncStorage.getItem("dailyFoodTimestamp")
+    const now = new Date().getTime()
+
+    if (timestamp && now - parseInt(timestamp) < 24 * 60 * 60 * 1000) {
+      const savedFoods = await AsyncStorage.getItem("dailyFoods")
+      const savedAvoid = await AsyncStorage.getItem("dailyAvoid")
+      const savedTips = await AsyncStorage.getItem("dailyTips")
+
+      if (savedFoods && savedAvoid && savedTips) {
+        setDailyFoods(JSON.parse(savedFoods))
+        setDailyAvoid(JSON.parse(savedAvoid))
+        setDailyTips(JSON.parse(savedTips))
         return
       }
-
-      const profileRes = await fetch(`https://pregwell-backend.onrender.com/api/patients/${id}`)
-      if (!profileRes.ok) {
-        throw new Error(`Failed to fetch profile: ${profileRes.status}`)
-      }
-      const profile = await profileRes.json()
-      setTrimester(profile.trimester || 1)
-
-      const [fRes, mRes, aRes, tRes] = await Promise.all([
-        fetch(`https://pregwell-backend.onrender.com/api/recommended-foods/${profile.trimester}`),
-        fetch(`https://pregwell-backend.onrender.com/api/meal-ideas/${profile.trimester}`),
-        fetch("https://pregwell-backend.onrender.com/api/foods-to-avoid"),
-        fetch("https://pregwell-backend.onrender.com/api/nutrition-tips"),
-      ])
-
-      const fData = await fRes.json()
-      const mData = await mRes.json()
-      const aData = await aRes.json()
-      const tData = await tRes.json()
-
-      setFoods(fData)
-      setMeals(mData)
-      setAvoid(aData)
-      setTips(tData)
-    } catch (err: any) {
-      console.error("Error fetching diet data:", err)
-      Alert.alert("Error", `Failed to load diet data: ${err.message || "Unknown error"}`)
-    } finally {
-      setLoading(false)
     }
-  }, [])
+
+    const newDailyFoods = getRandomItems(foods, 3)
+    const newDailyAvoid = getRandomItems(avoid, 3)
+    const newDailyTips = getRandomItems(tips, 3)
+
+    await AsyncStorage.setItem("dailyFoods", JSON.stringify(newDailyFoods))
+    await AsyncStorage.setItem("dailyAvoid", JSON.stringify(newDailyAvoid))
+    await AsyncStorage.setItem("dailyTips", JSON.stringify(newDailyTips))
+    await AsyncStorage.setItem("dailyFoodTimestamp", now.toString())
+
+    setDailyFoods(newDailyFoods)
+    setDailyAvoid(newDailyAvoid)
+    setDailyTips(newDailyTips)
+  } catch (error) {
+    console.error("Error loading daily picks:", error)
+  }
+}
+
 
   useEffect(() => {
     fetchAllData()
@@ -164,33 +230,34 @@ const DietScreen = () => {
       </LinearGradient>
 
       <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
-        {/* Recommended Foods */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            <Ionicons name="checkmark-circle-outline" size={20} color="#4CAF50" /> Recommended Foods
-          </Text>
-          <Text style={styles.sectionSubtitle}>Nutrient-rich foods for a healthy pregnancy</Text>
-          {foods.length > 0 ? (
-            foods.map((food, index) => (
-              <View key={index} style={styles.card}>
-                <View style={styles.cardIconContainer}>
-                  <Ionicons name="leaf-outline" size={24} color="#4CAF50" />
-                </View>
-                <View style={styles.cardTextContent}>
-                  <Text style={styles.cardTitle}>{food.name}</Text>
-                  <Text style={styles.cardSubtitle}>{food.category}</Text>
-                  <Text style={styles.cardDesc}>{food.benefit}</Text>
-                </View>
-              </View>
-            ))
-          ) : (
-            <View style={styles.emptyStateCard}>
-              <Ionicons name="sad-outline" size={40} color="#D1C4E9" />
-              <Text style={styles.emptyTitleSmall}>No recommended foods found.</Text>
-              <Text style={styles.emptySubtitleSmall}>Check back later for updates!</Text>
-            </View>
-          )}
+{/* Recommended Foods */}
+<View style={styles.section}>
+  <Text style={styles.sectionTitle}>
+    <Ionicons name="checkmark-circle-outline" size={20} color="#4CAF50" /> Recommended Foods
+  </Text>
+  <Text style={styles.sectionSubtitle}>Nutrient-rich foods for a healthy pregnancy</Text>
+  {dailyFoods.length > 0 ? (
+    dailyFoods.map((food, index) => (
+      <View key={index} style={styles.card}>
+        <View style={styles.cardIconContainer}>
+          <Ionicons name="leaf-outline" size={24} color="#4CAF50" />
         </View>
+        <View style={styles.cardTextContent}>
+          <Text style={styles.cardTitle}>{food.name}</Text>
+          <Text style={styles.cardSubtitle}>{food.category}</Text>
+          <Text style={styles.cardDesc}>{food.benefit}</Text>
+        </View>
+      </View>
+    ))
+  ) : (
+    <View style={styles.emptyStateCard}>
+      <Ionicons name="sad-outline" size={40} color="#D1C4E9" />
+      <Text style={styles.emptyTitleSmall}>No recommended foods found.</Text>
+      <Text style={styles.emptySubtitleSmall}>Check back later for updates!</Text>
+    </View>
+  )}
+</View>
+
 
         {/* Meal Ideas */}
         <View style={styles.section}>
@@ -216,10 +283,20 @@ const DietScreen = () => {
                   <Text style={styles.mealInstructions}>
                     <Text style={{ fontWeight: "bold" }}>Instructions:</Text> {meal.instructions}
                   </Text>
-                  <TouchableOpacity style={styles.viewRecipeButton}>
-                    <Ionicons name="book-outline" size={16} color="#C672E5" />
-                    <Text style={styles.viewRecipeButtonText}>View Full Recipe</Text>
-                  </TouchableOpacity>
+<TouchableOpacity
+  style={styles.viewRecipeButton}
+  onPress={() => {
+    if (meal.recipe_url) {
+      Linking.openURL(meal.recipe_url)
+    } else {
+      Alert.alert("Recipe Unavailable", "No full recipe URL provided.")
+    }
+  }}
+>
+  <Ionicons name="book-outline" size={16} color="#C672E5" />
+  <Text style={styles.viewRecipeButtonText}>View Full Recipe</Text>
+</TouchableOpacity>
+
                 </View>
               </View>
             ))
@@ -232,32 +309,33 @@ const DietScreen = () => {
           )}
         </View>
 
-        {/* Foods to Avoid */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            <Ionicons name="warning-outline" size={20} color="#EF4444" /> Foods to Avoid
-          </Text>
-          <Text style={styles.sectionSubtitle}>Important foods to limit or avoid during pregnancy</Text>
-          {avoid.length > 0 ? (
-            avoid.map((item, index) => (
-              <View key={index} style={styles.avoidCard}>
-                <View style={styles.avoidIconContainer}>
-                  <Ionicons name="close-circle-outline" size={24} color="#EF4444" />
-                </View>
-                <View style={styles.avoidTextContent}>
-                  <Text style={styles.avoidTitle}>{item.name}</Text>
-                  <Text style={styles.avoidReason}>{item.reason}</Text>
-                </View>
-              </View>
-            ))
-          ) : (
-            <View style={styles.emptyStateCard}>
-              <Ionicons name="happy-outline" size={40} color="#D1C4E9" />
-              <Text style={styles.emptyTitleSmall}>No specific foods to avoid listed.</Text>
-              <Text style={styles.emptySubtitleSmall}>Always consult your doctor for personalized advice.</Text>
-            </View>
-          )}
+{/* Foods to Avoid */}
+<View style={styles.section}>
+  <Text style={styles.sectionTitle}>
+    <Ionicons name="warning-outline" size={20} color="#EF4444" /> Foods to Avoid
+  </Text>
+  <Text style={styles.sectionSubtitle}>Important foods to limit or avoid during pregnancy</Text>
+  {dailyAvoid.length > 0 ? (
+    dailyAvoid.map((item, index) => (
+      <View key={index} style={styles.avoidCard}>
+        <View style={styles.avoidIconContainer}>
+          <Ionicons name="close-circle-outline" size={24} color="#EF4444" />
         </View>
+        <View style={styles.avoidTextContent}>
+          <Text style={styles.avoidTitle}>{item.name}</Text>
+          <Text style={styles.avoidReason}>{item.reason}</Text>
+        </View>
+      </View>
+    ))
+  ) : (
+    <View style={styles.emptyStateCard}>
+      <Ionicons name="happy-outline" size={40} color="#D1C4E9" />
+      <Text style={styles.emptyTitleSmall}>No specific foods to avoid listed.</Text>
+      <Text style={styles.emptySubtitleSmall}>Always consult your doctor for personalized advice.</Text>
+    </View>
+  )}
+</View>
+
 
         {/* Nutrition Tips */}
         <View style={styles.section}>
@@ -265,8 +343,8 @@ const DietScreen = () => {
             <Ionicons name="bulb-outline" size={20} color="#2196F3" /> Nutrition Tips
           </Text>
           <Text style={styles.sectionSubtitle}>Helpful advice for a balanced diet</Text>
-          {tips.length > 0 ? (
-            tips.map((tip, index) => (
+          {dailyTips.length > 0 ? (
+            dailyTips.map((tip, index) => (
               <View key={index} style={styles.tipCard}>
                 <Ionicons name="star-outline" size={18} color="#2196F3" style={styles.tipBulletIcon} />
                 <Text style={styles.tipText}>{tip.tip}</Text>

@@ -9,9 +9,9 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
-  Image,
+  ImageBackground,
   Platform,
-  SafeAreaView,
+  SafeAreaView, // Changed from Image to ImageBackground
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -31,6 +31,7 @@ interface Exercise {
   category: string
   image: string
   is_favorite?: boolean
+  youtube_url?: string // Added youtube_url for navigation
 }
 
 const ExerciseScreen = () => {
@@ -39,6 +40,7 @@ const ExerciseScreen = () => {
   const [categoryExercises, setCategoryExercises] = useState<Exercise[]>([])
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
+  const [pregnancyProfile, setPregnancyProfile] = useState<any | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -49,50 +51,90 @@ const ExerciseScreen = () => {
     getUserId()
   }, [])
 
-  const fetchDailyExercise = useCallback(async (currentUserId: string) => {
-    try {
-      const res = await fetch(`https://pregwell-backend.onrender.com/api/exercises/daily/${currentUserId}`)
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
-      const data = await res.json()
-      setDailyExercise(data)
-    } catch (err) {
-      console.error("Daily exercise fetch error:", err)
-      Alert.alert("Error", "Failed to load daily exercise.")
-      setDailyExercise(null)
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const token = await AsyncStorage.getItem("token")
+        const userId = await AsyncStorage.getItem("userId")
+        const response = await fetch(
+          `https://pregwell-backend.onrender.com/api/patients/profile/${userId}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        )
+        const data = await response.json()
+        setPregnancyProfile(data)
+      } catch (error) {
+        console.error("Error fetching profile:", error)
+        Alert.alert("Error", "Failed to load user profile.")
+      }
     }
+    fetchProfile()
   }, [])
 
-  const fetchFavorites = useCallback(async (currentUserId: string) => {
-    try {
-      const res = await fetch(`https://pregwell-backend.onrender.com/api/exercises/favorites/${currentUserId}`)
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
-      const data = await res.json()
-      setFavorites(data)
-    } catch (err) {
-      console.error("Favorites fetch error:", err)
-      Alert.alert("Error", "Failed to load favorite exercises.")
-      setFavorites([])
-    }
-  }, [])
+  const fetchDailyExercise = useCallback(
+    async (currentUserId: string) => {
+      try {
+        const res = await fetch(
+          `https://pregwell-backend.onrender.com/api/exercises/daily/${currentUserId}`
+        )
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
+        const data = await res.json()
+        setDailyExercise(data)
+      } catch (err) {
+        console.error("Daily exercise fetch error:", err)
+        Alert.alert("Error", "Failed to load daily exercise.")
+        setDailyExercise(null)
+      }
+    },
+    [setDailyExercise]
+  )
 
-  const fetchByCategory = useCallback(async (category: string) => {
-    try {
-      const res = await fetch(`https://pregwell-backend.onrender.com/api/exercises?category=${category}`)
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
-      const data = await res.json()
-      setCategoryExercises(data)
-    } catch (err) {
-      console.error("Category fetch error:", err)
-      Alert.alert("Error", `Failed to load ${category} exercises.`)
-      setCategoryExercises([])
-    }
-  }, [])
+  const fetchFavorites = useCallback(
+    async (currentUserId: string) => {
+      try {
+        const res = await fetch(
+          `https://pregwell-backend.onrender.com/api/exercises/favorites/${currentUserId}`
+        )
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
+        const data = await res.json()
+        setFavorites(data)
+      } catch (err) {
+        console.error("Favorites fetch error:", err)
+        Alert.alert("Error", "Failed to load favorite exercises.")
+        setFavorites([])
+      }
+    },
+    [setFavorites]
+  )
+
+  const fetchByCategory = useCallback(
+    async (category: string) => {
+      try {
+        const res = await fetch(
+          `https://pregwell-backend.onrender.com/api/exercises?category=${category}`
+        )
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
+        const data = await res.json()
+        setCategoryExercises(data)
+      } catch (err) {
+        console.error("Category fetch error:", err)
+        Alert.alert("Error", `Failed to load ${category} exercises.`)
+        setCategoryExercises([])
+      }
+    },
+    [setCategoryExercises]
+  )
 
   useEffect(() => {
     const loadAllData = async () => {
       if (userId) {
         setLoading(true)
-        await Promise.all([fetchDailyExercise(userId), fetchFavorites(userId), fetchByCategory("Stretching")])
+        await Promise.all([
+          fetchDailyExercise(userId),
+          fetchFavorites(userId),
+          fetchByCategory("Stretching"),
+        ])
         setLoading(false)
       }
     }
@@ -104,10 +146,26 @@ const ExerciseScreen = () => {
       key={exercise.id}
       style={[styles.exerciseCard, isDaily && styles.dailyExerciseCard]}
       activeOpacity={0.8}
-      onPress={() => Alert.alert("Play", `Starting ${exercise.name}!`)}
+      onPress={() =>
+        router.push({
+          pathname: "/ExerciseVideo",
+          params: {
+            name: exercise.name,
+            youtubeUrl: exercise.youtube_url,
+          },
+        })
+      }
     >
-      <Image source={{ uri: exercise.image || "/placeholder.svg?height=160&width=400" }} style={styles.exerciseImage} />
-      <LinearGradient colors={["transparent", "rgba(0,0,0,0.6)"]} style={styles.imageOverlay} />
+      <ImageBackground // Changed to ImageBackground
+        source={{ uri: exercise.image || "/placeholder.svg?height=160&width=400" }}
+        style={styles.exerciseImage}
+        resizeMode="cover" // Ensure resizeMode is set
+      >
+        <LinearGradient colors={["transparent", "rgba(0,0,0,0.6)"]} style={styles.imageOverlay} />
+        <View style={styles.videoOverlayIcon}>
+          <Ionicons name="play-circle" size={60} color="rgba(255,255,255,0.8)" />
+        </View>
+      </ImageBackground>
       <View style={styles.exerciseCategoryBadge}>
         <Ionicons name="fitness-outline" size={14} color="white" />
         <Text style={styles.exerciseCategoryText}>{exercise.category}</Text>
@@ -124,10 +182,6 @@ const ExerciseScreen = () => {
           <Ionicons name="barbell-outline" size={16} color="#977A9C" />
           <Text style={styles.exerciseMeta}>{exercise.category}</Text>
         </View>
-        <TouchableOpacity style={styles.playButton} onPress={() => Alert.alert("Play", `Starting ${exercise.name}!`)}>
-          <Ionicons name="play-circle" size={30} color="#C672E5" />
-          <Text style={styles.playButtonText}>Start Workout</Text>
-        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   )
@@ -135,7 +189,11 @@ const ExerciseScreen = () => {
   const handleRefreshAll = async () => {
     if (userId) {
       setLoading(true)
-      await Promise.all([fetchDailyExercise(userId), fetchFavorites(userId), fetchByCategory("Stretching")])
+      await Promise.all([
+        fetchDailyExercise(userId),
+        fetchFavorites(userId),
+        fetchByCategory("Stretching"),
+      ])
       setLoading(false)
     } else {
       Alert.alert("Error", "User not logged in. Cannot refresh data.")
@@ -145,7 +203,12 @@ const ExerciseScreen = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#C672E5" />
-      <LinearGradient colors={["#C672E5", "#9B4DCC"]} style={styles.header} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+      <LinearGradient
+        colors={["#C672E5", "#9B4DCC"]}
+        style={styles.header}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.headerContent}>
             <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -153,18 +216,21 @@ const ExerciseScreen = () => {
             </TouchableOpacity>
 
             <View style={styles.headerCenter}>
-              <Text style={styles.headerTitle}>Hi Mama 💜</Text>
-              <View style={styles.headerBadge}>
-                <Ionicons name="calendar-outline" size={12} color="#C672E5" />
-                <Text style={styles.headerBadgeText}>Daily Plan</Text>
-              </View>
+              <Text style={styles.headerTitle}>
+                Hi {pregnancyProfile ? pregnancyProfile.first_name : "Loading..."} 💜
+              </Text>
+              <Text style={styles.headerBadgeText}>
+                Trimester {pregnancyProfile ? pregnancyProfile.trimester : "Loading..."} · Week {pregnancyProfile ? pregnancyProfile.week_number : "Loading..."}
+              </Text>
             </View>
 
             <TouchableOpacity style={styles.refreshButton} onPress={handleRefreshAll}>
               <Ionicons name="refresh-outline" size={22} color="white" />
             </TouchableOpacity>
           </View>
-          <Text style={styles.headerSubtitle}>You're in your 2nd Trimester · Week 22</Text>
+          <Text style={styles.headerSubtitle}>
+            Your personalized exercise plan
+          </Text>
         </SafeAreaView>
       </LinearGradient>
 
@@ -190,25 +256,6 @@ const ExerciseScreen = () => {
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Your Favorites</Text>
-              {favorites.length > 0 ? (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.horizontalScroll}
-                >
-                  {favorites.map((exercise) => renderCard(exercise))}
-                </ScrollView>
-              ) : (
-                <View style={styles.emptyStateCard}>
-                  <Ionicons name="heart-outline" size={40} color="#D1C4E9" />
-                  <Text style={styles.emptyTitleSmall}>No favorites yet.</Text>
-                  <Text style={styles.emptySubtitleSmall}>Like an exercise to add it here!</Text>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.section}>
               <Text style={styles.sectionTitle}>Explore: Stretching</Text>
               {categoryExercises.length > 0 ? (
                 <ScrollView
@@ -227,7 +274,7 @@ const ExerciseScreen = () => {
               )}
             </View>
 
-            <TouchableOpacity onPress={() => router.push("/explore")} style={styles.exploreMoreButton}>
+            <TouchableOpacity onPress={() => router.push("/Explore")} style={styles.exploreMoreButton}>
               <LinearGradient colors={["#C672E5", "#9B4DCC"]} style={styles.exploreMoreButtonGradient}>
                 <Ionicons name="grid-outline" size={20} color="white" />
                 <Text style={styles.exploreMoreButtonText}>Explore More Categories</Text>
@@ -363,7 +410,8 @@ const styles = StyleSheet.create({
   exerciseImage: {
     height: 160,
     width: "100%",
-    resizeMode: "cover",
+    justifyContent: "center", // Center children vertically
+    alignItems: "center", // Center children horizontally
   },
   imageOverlay: {
     position: "absolute",
@@ -382,6 +430,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 15,
+    zIndex: 2, // Ensure badge is above overlay and icon
   },
   exerciseCategoryText: {
     color: "white",
@@ -420,22 +469,6 @@ const styles = StyleSheet.create({
     height: 15,
     backgroundColor: "#E0E0E0",
     marginHorizontal: 5,
-  },
-  playButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#F3E5F5",
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#C672E5",
-  },
-  playButtonText: {
-    color: "#C672E5",
-    fontSize: 16,
-    fontWeight: "bold",
-    marginLeft: 8,
   },
   emptyStateCard: {
     alignItems: "center",
@@ -489,5 +522,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     marginLeft: 10,
+  },
+  videoOverlayIcon: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1, // Ensure it's above the image but below the badge
   },
 })

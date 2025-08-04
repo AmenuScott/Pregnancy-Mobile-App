@@ -25,7 +25,7 @@ const babyTipsRoutes = require("./routes/babyTipsRoutes")
 const personalizedRoutes = require("./routes/personalizedRoutes");
 const babyProfileRoutes = require("./routes/babyProfileRoutes");
 const dietRoutes = require("./routes/dietRoutes");
-
+const notificationRoutes = require("./routes/notificationRoutes");
 
 const app = express();
 const server = http.createServer(app);
@@ -60,6 +60,8 @@ app.use("/api", babyTipsRoutes);
 app.use(personalizedRoutes);
 app.use("/api", babyProfileRoutes);
 app.use(dietRoutes);
+app.use(notificationRoutes);
+
 
 // Base route
 app.get("/", (req, res) => {
