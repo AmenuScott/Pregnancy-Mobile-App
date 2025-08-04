@@ -12,7 +12,6 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 const userRoutes = require("./routes/userRoutes");
 const patientRoutes = require("./routes/patientRoutes");
 const setupRoutes = require("./routes/setupRoutes");
-const notificationRoutes = require("./routes/notificationRoutes");
 const tipRoutes = require("./routes/tipRoutes");
 const exercisesRoutes = require("./routes/exercisesRoutes")
 const emergencyRoutes = require("./routes/emergencyRoutes");
@@ -47,7 +46,6 @@ app.use(express.json());
 app.use("/api/users", userRoutes);
 app.use("/api/", patientRoutes);
 app.use("/api/setup", setupRoutes);
-app.use("/api/notifications", notificationRoutes);
 app.use("/api/", tipRoutes);
 app.use(exercisesRoutes)
 app.use('/api/emergency_contacts', emergencyRoutes);
