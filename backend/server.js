@@ -13,14 +13,14 @@ const userRoutes = require("./routes/userRoutes");
 const patientRoutes = require("./routes/patientRoutes");
 const setupRoutes = require("./routes/setupRoutes");
 const tipRoutes = require("./routes/tipRoutes");
-const exercisesRoutes = require("./routes/exercisesRoutes")
+const exercisesRoutes = require("./routes/exercisesRoutes");
 const emergencyRoutes = require("./routes/emergencyRoutes");
 const messageRoutes = require("./routes/messagesRoutes");
 const healthRoutes = require("./routes/healthRoutes");
 const recoveryRoutes = require("./routes/recoveryRoutes");
-const recoveryTipsRoutes = require("./routes/recoveryTipsRoutes")
+const recoveryTipsRoutes = require("./routes/recoveryTipsRoutes");
 const menstrualRoutes = require("./routes/menstrualRoutes");
-const babyTipsRoutes = require("./routes/babyTipsRoutes")
+const babyTipsRoutes = require("./routes/babyTipsRoutes");
 const personalizedRoutes = require("./routes/personalizedRoutes");
 const babyProfileRoutes = require("./routes/babyProfileRoutes");
 const dietRoutes = require("./routes/dietRoutes");
@@ -32,7 +32,7 @@ const server = http.createServer(app);
 // Socket.IO setup
 const io = new Server(server, {
   cors: {
-    origin: "*", // Allow frontend connection (e.g. Expo app)
+    origin: "*",
   },
 });
 
@@ -47,8 +47,8 @@ app.use("/api/users", userRoutes);
 app.use("/api/", patientRoutes);
 app.use("/api/setup", setupRoutes);
 app.use("/api/", tipRoutes);
-app.use(exercisesRoutes)
-app.use('/api/emergency_contacts', emergencyRoutes);
+app.use(exercisesRoutes);
+app.use("/api/emergency_contacts", emergencyRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/health", healthRoutes);
 app.use("/api/", recoveryRoutes);
@@ -60,13 +60,12 @@ app.use("/api", babyProfileRoutes);
 app.use(dietRoutes);
 app.use(notificationRoutes);
 
-
 // Base route
 app.get("/", (req, res) => {
   res.send("🚀 PregCare API is up and running!");
 });
 
-// Optional: test Supabase DB connection
+// Optional: Supabase connection test
 app.get("/health", async (req, res) => {
   const { data, error } = await supabase.rpc("now");
   if (error) {
@@ -76,15 +75,17 @@ app.get("/health", async (req, res) => {
   res.json({ dbTime: data });
 });
 
-// ✅ SOCKET.IO Real-time logic
+// ✅ SOCKET.IO REAL-TIME LOGIC
 io.on("connection", (socket) => {
   console.log("✅ User connected:", socket.id);
 
+  // Join personal room
   socket.on("join", (userId) => {
     socket.join(userId.toString());
     console.log(`👥 User ${userId} joined room`);
   });
 
+  // Send message
   socket.on("send_message", async (data) => {
     const { sender_id, receiver_id, content } = data;
 
@@ -98,33 +99,24 @@ io.on("connection", (socket) => {
       if (error) throw error;
 
       io.to(receiver_id.toString()).emit("receive_message", savedMessage);
-      console.log(`📨 Message sent from ${sender_id} to ${receiver_id}`);
+      console.log(`📨 Message from ${sender_id} → ${receiver_id}`);
     } catch (err) {
       console.error("❌ Supabase message error:", err.message);
     }
   });
 
+  // Delete message
   socket.on("delete_message", async (messageId) => {
     try {
-      const { error } = await supabase
-        .from("messages")
-        .delete()
-        .eq("id", messageId);
-
+      const { error } = await supabase.from("messages").delete().eq("id", messageId);
       if (error) throw error;
 
-      io.emit("message_deleted", messageId); // optional: emit to update frontend
+      io.emit("message_deleted", messageId); // Optional: notify clients
       console.log("🗑️ Deleted message:", messageId);
     } catch (err) {
       console.error("❌ Failed to delete message:", err.message);
     }
   });
-
-  socket.on("disconnect", () => {
-    console.log("❌ User disconnected:", socket.id);
-  });
-});
-
 
   // Typing indicators
   socket.on("typing", ({ senderId, receiverId }) => {
@@ -140,10 +132,7 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     console.log("❌ User disconnected:", socket.id);
   });
-
-
-
-
+});
 
 // Start server
 server.listen(PORT, "0.0.0.0", () => {
