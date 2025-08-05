@@ -105,6 +105,27 @@ io.on("connection", (socket) => {
     } catch (err) {
       console.error("❌ Supabase message error:", err.message);
     }
+
+      socket.on("delete_message", async (messageId) => {
+    try {
+      const { error } = await supabase
+        .from("messages")
+        .delete()
+        .eq("id", messageId);
+
+      if (error) throw error;
+
+      io.emit("message_deleted", messageId); // notify all clients
+      console.log("🗑️ Deleted message:", messageId);
+    } catch (err) {
+      console.error("❌ Failed to delete message:", err.message);
+    }
+  });
+
+  socket.on("disconnect", () => {
+    console.log("❌ User disconnected:", socket.id);
+  });
+});
   });
 
   // Typing indicators
@@ -123,21 +144,7 @@ io.on("connection", (socket) => {
   });
 });
 
-socket.on("delete_message", async (messageId) => {
-  try {
-    const { error } = await supabase
-      .from("messages")
-      .delete()
-      .eq("id", messageId);
 
-    if (error) throw error;
-
-    io.emit("message_deleted", messageId); // broadcast to all clients
-    console.log("🗑️ Message deleted:", messageId);
-  } catch (err) {
-    console.error("❌ Error deleting message:", err.message);
-  }
-});
 
 
 // Start server
