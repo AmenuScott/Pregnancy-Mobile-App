@@ -146,7 +146,11 @@ const ExerciseScreen = () => {
       key={exercise.id}
       style={[styles.exerciseCard, isDaily && styles.dailyExerciseCard]}
       activeOpacity={0.8}
-      onPress={() =>
+      onPress={() => {
+        if (!exercise.youtube_url) {
+          Alert.alert("Error", "This exercise does not have a video.")
+          return
+        }
         router.push({
           pathname: "/ExerciseVideo",
           params: {
@@ -154,7 +158,7 @@ const ExerciseScreen = () => {
             youtubeUrl: exercise.youtube_url,
           },
         })
-      }
+      }}
     >
       <ImageBackground // Changed to ImageBackground
         source={{ uri: exercise.image || "/placeholder.svg?height=160&width=400" }}

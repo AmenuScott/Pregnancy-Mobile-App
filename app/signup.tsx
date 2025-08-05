@@ -108,7 +108,7 @@ const handleSignup = async () => {
 
       if (token) {
         await AsyncStorage.setItem("token", token)
-        await AsyncStorage.setItem("userId", userId.toString())
+        await AsyncStorage.setItem("user_Id", userId.toString())
         await AsyncStorage.setItem("profileCompleted", profileCompleted?.toString() || "false")
 
         Alert.alert("Signup Success", "Welcome! Now let's complete your profile.", [

@@ -65,7 +65,9 @@ const MessagesScreen = () => {
     fetchMessages()
   }, [fetchMessages])
 
-  const filteredMessages = messages.filter((msg) => msg.name.toLowerCase().includes(search.toLowerCase()))
+  const filteredMessages = messages.filter((msg) =>
+    msg.name?.toLowerCase().includes(search.toLowerCase())
+  )
 
   const formatTime = (dateString: string): string => {
     try {
@@ -103,7 +105,7 @@ const MessagesScreen = () => {
           pathname: "/ChatScreen/[id]",
           params: {
             id: item.id,
-            receiverName: item.name,
+            receiverName: item.name || "Unknown",
           },
         })
       }
@@ -113,10 +115,12 @@ const MessagesScreen = () => {
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>
             {item.name
-              .split(" ")
-              .map((n) => n[0])
-              .join("")
-              .toUpperCase()}
+              ? item.name
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")
+                  .toUpperCase()
+              : ""}
           </Text>
         </View>
         {item.unreadCount && item.unreadCount > 0 && <View style={styles.onlineIndicator} />}
@@ -125,14 +129,14 @@ const MessagesScreen = () => {
       <View style={styles.chatContent}>
         <View style={styles.chatHeader}>
           <Text style={styles.chatName} numberOfLines={1}>
-            {item.name}
+            {item.name || "Unknown"}
           </Text>
           <Text style={styles.chatTime}>{formatTime(item.created_at)}</Text>
         </View>
 
         <View style={styles.chatFooter}>
           <Text numberOfLines={2} style={styles.lastMessage}>
-            {item.content}
+            {item.content || "No messages yet"}
           </Text>
           {item.unreadCount && item.unreadCount > 0 && (
             <View style={styles.unreadBadge}>

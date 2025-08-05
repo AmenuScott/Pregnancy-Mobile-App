@@ -1,201 +1,171 @@
-"use client"
-
-import { Ionicons } from "@expo/vector-icons"
-import { LinearGradient } from "expo-linear-gradient"
-import { useLocalSearchParams, useRouter } from "expo-router"
-import { Dimensions, Platform, SafeAreaView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native"
-import { WebView } from "react-native-webview"
-
-const { width } = Dimensions.get("window")
-const statusBarHeight = Platform.OS === "ios" ? 44 : StatusBar.currentHeight || 24
+// app/ExerciseVideo.tsx
+import { useLocalSearchParams } from "expo-router";
+import { useState } from "react";
+import { Alert, Dimensions, StyleSheet, Text, View } from "react-native";
+import { WebView } from "react-native-webview";
 
 const ExerciseVideo = () => {
-  const { name, youtubeUrl } = useLocalSearchParams()
-  const router = useRouter()
+  const { name, youtubeUrl } = useLocalSearchParams();
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  // Extract YouTube video ID from various URL formats
+  const extractVideoId = (url: string): string | null => {
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+      /youtube\.com\/watch\?.*v=([^&\n?#]+)/,
+    ];
+
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+    return null;
+  };
+
+  // Convert any YouTube URL to proper embed format
+  const getEmbedUrl = (url: string): string | null => {
+    const videoId = extractVideoId(url);
+    if (!videoId) return null;
+    
+    // Return embed URL with additional parameters for better compatibility
+    return `https://www.youtube.com/embed/${videoId}?autoplay=0&fs=1&rel=0&showinfo=0&modestbranding=1`;
+  };
+
+  const embedUrl = youtubeUrl ? getEmbedUrl(String(youtubeUrl)) : null;
+
+  const handleWebViewError = () => {
+    setHasError(true);
+    setIsLoading(false);
+    Alert.alert(
+      "Video Error",
+      "Unable to load the video. Please check your internet connection or try again later.",
+      [{ text: "OK" }]
+    );
+  };
+
+  const handleLoadEnd = () => {
+    setIsLoading(false);
+  };
+
+  if (!embedUrl) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>{name || "Exercise Video"}</Text>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorTitle}>Video not available</Text>
+          <Text style={styles.subtitle}>
+            Invalid YouTube URL provided. Please check the video link.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>{name || "Exercise Video"}</Text>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorTitle}>Failed to load video</Text>
+          <Text style={styles.subtitle}>
+            Please check your internet connection or try again later.
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#C672E5" />
-
-      {/* Modern Header with Gradient */}
-      <LinearGradient colors={["#C672E5", "#9B4DCC"]} style={styles.header} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.headerContent}>
-            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-              <Ionicons name="chevron-back" size={24} color="white" />
-            </TouchableOpacity>
-
-            <View style={styles.headerCenter}>
-              <Text style={styles.headerTitle} numberOfLines={1}>
-                {name || "Exercise Video"}
-              </Text>
-              <View style={styles.headerBadge}>
-                <Ionicons name="play-circle-outline" size={12} color="#C672E5" />
-                <Text style={styles.headerBadgeText}>Workout Video</Text>
-              </View>
-            </View>
-
-            {/* Placeholder for a share button or other action */}
-            <TouchableOpacity style={styles.shareButton}>
-              <Ionicons name="share-outline" size={22} color="white" />
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
-      </LinearGradient>
-
-      {/* Video Player Section */}
-      <View style={styles.videoContainer}>
-        {youtubeUrl ? (
-          <WebView
-            style={styles.video}
-            source={{ uri: youtubeUrl as string }}
-            javaScriptEnabled
-            allowsFullscreenVideo
-            domStorageEnabled={true}
-            mediaPlaybackRequiresUserAction={false}
-          />
-        ) : (
-          <View style={styles.noVideoContainer}>
-            <Ionicons name="videocam-off-outline" size={80} color="#D1C4E9" />
-            <Text style={styles.noVideoText}>Video not available</Text>
-            <Text style={styles.noVideoSubtext}>Please check the exercise details.</Text>
-          </View>
-        )}
-      </View>
-
-      {/* Content Area (for future descriptions, benefits, etc.) */}
-      <View style={styles.contentArea}>
-        <Text style={styles.sectionTitle}>Exercise Details</Text>
-        <Text style={styles.sectionDescription}>
-          This section can be expanded to include detailed instructions, benefits, and tips for the exercise. For now,
-          enjoy the video!
-        </Text>
-        {/* You can add more content here, e.g., FlatList for steps, related exercises */}
-      </View>
+      <Text style={styles.title}>{name || "Exercise Video"}</Text>
+      
+      {isLoading && (
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading video...</Text>
+        </View>
+      )}
+      
+      <WebView
+        style={[styles.video, isLoading && { opacity: 0 }]}
+        source={{ 
+          uri: embedUrl,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1'
+          }
+        }}
+        javaScriptEnabled={true}
+        domStorageEnabled={true}
+        allowsFullscreenVideo={true}
+        allowsInlineMediaPlayback={true}
+        mediaPlaybackRequiresUserAction={false}
+        onLoadEnd={handleLoadEnd}
+        onError={handleWebViewError}
+        onHttpError={handleWebViewError}
+        startInLoadingState={false}
+        mixedContentMode="compatibility"
+        originWhitelist={['*']}
+      />
     </View>
-  )
-}
+  );
+};
 
-export default ExerciseVideo
+export default ExerciseVideo;
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FDF7FF", // Light purple background
+    paddingTop: 50,
+    backgroundColor: "#FFF5FC",
   },
-  safeArea: {
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
-  },
-  header: {
-    padding: 20,
-    paddingTop: statusBarHeight + 10,
-    paddingBottom: 25,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  headerContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: "center",
-    marginHorizontal: 10, // Add some margin to prevent title from touching buttons
-  },
-  headerTitle: {
-    fontSize: 20, // Slightly smaller for better fit in header
+  title: {
+    fontSize: 22,
     fontWeight: "bold",
-    color: "white",
-    marginBottom: 4,
+    margin: 20,
     textAlign: "center",
+    color: "#4B2354",
   },
-  headerBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.9)",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 15,
-  },
-  headerBadgeText: {
-    fontSize: 12,
-    color: "#C672E5",
-    fontWeight: "600",
-    marginLeft: 5,
-  },
-  shareButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  videoContainer: {
-    width: "100%",
-    height: 250, // Fixed height for the video player
-    backgroundColor: "#000", // Black background for video area
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
+  subtitle: {
+    fontSize: 16,
+    color: "#6D4B75",
+    textAlign: "center",
+    marginTop: 10,
+    paddingHorizontal: 20,
   },
   video: {
-    width: "100%",
-    height: "100%",
+    width: Dimensions.get("window").width,
+    height: 250,
+    backgroundColor: "#000",
   },
-  noVideoContainer: {
+  errorContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#F0F0F0",
-    width: "100%",
+    paddingHorizontal: 20,
   },
-  noVideoText: {
+  errorTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#7F8C8D",
-    marginTop: 10,
-  },
-  noVideoSubtext: {
-    fontSize: 14,
-    color: "#977A9C",
-    marginTop: 5,
-    textAlign: "center",
-    paddingHorizontal: 20,
-  },
-  contentArea: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 10,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#4B2354",
+    color: "#8B4B8C",
     marginBottom: 10,
+    textAlign: "center",
   },
-  sectionDescription: {
-    fontSize: 14,
+  loadingContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 245, 252, 0.8)",
+    zIndex: 1,
+  },
+  loadingText: {
+    fontSize: 16,
     color: "#6D4B75",
-    lineHeight: 20,
+    fontWeight: "500",
   },
-})
+});

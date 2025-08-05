@@ -53,7 +53,7 @@ const handleLogin = async () => {
       }
 
       await AsyncStorage.setItem("token", token);
-      await AsyncStorage.setItem("userId", userId.toString());
+      await AsyncStorage.setItem("user_Id", userId.toString());
       await AsyncStorage.setItem(
         "profileCompleted",
         (profileCompleted === true || profileCompleted === "true") ? "true" : "false"

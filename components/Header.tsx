@@ -1,82 +1,96 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import NotificationBell from '../components/NotificationBell'; // ✅ Import bell
+// 🔁 Adjust this path based on your folder structure
 
 interface User {
-  first_name: string;
-  last_name?: string;
+  first_name: string
+  last_name?: string
 }
 
 interface PregnancyProfile {
-  last_menstrual_period?: string;
+  last_menstrual_period?: string
 }
 
 interface ProfileResponse {
-  user: User;
-  pregnancyProfile: PregnancyProfile | null;
+  user: User
+  pregnancyProfile: PregnancyProfile | null
 }
 
 interface HeaderProps {
-  token: string;
+  token: string
 }
 
 function calculateTrimester(lmp: string | undefined): string {
-  if (!lmp) return 'Unknown';
+  if (!lmp) return 'Unknown'
 
-  const lmpDate = new Date(lmp);
-  const today = new Date();
-  const diffDays = Math.floor((today.getTime() - lmpDate.getTime()) / (1000 * 60 * 60 * 24));
-  const weeksPregnant = Math.floor(diffDays / 7);
+  const lmpDate = new Date(lmp)
+  const today = new Date()
+  const diffDays = Math.floor(
+    (today.getTime() - lmpDate.getTime()) / (1000 * 60 * 60 * 24)
+  )
+  const weeksPregnant = Math.floor(diffDays / 7)
 
-  if (weeksPregnant <= 12) return 'First Trimester';
-  else if (weeksPregnant <= 26) return 'Second Trimester';
-  else if (weeksPregnant <= 40) return 'Third Trimester';
-  else return 'Post Term';
+  if (weeksPregnant <= 12) return 'First Trimester'
+  else if (weeksPregnant <= 26) return 'Second Trimester'
+  else if (weeksPregnant <= 40) return 'Third Trimester'
+  else return 'Post Term'
 }
 
 const Header: React.FC<HeaderProps> = ({ token }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [trimester, setTrimester] = useState<string>('Loading...');
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null)
+  const [trimester, setTrimester] = useState<string>('Loading...')
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchUserProfile = async () => {
     try {
-      setLoading(true);
-      setError(null);
-      const response = await fetch('https://pregwell-backend.onrender.com/api/users/profile', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      setLoading(true)
+      setError(null)
+      const response = await fetch(
+        'https://pregwell-backend.onrender.com/api/users/profile',
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      )
 
-      if (!response.ok) throw new Error('Failed to fetch profile');
+      if (!response.ok) throw new Error('Failed to fetch profile')
 
-      const data: ProfileResponse = await response.json();
-      setUser(data.user);
+      const data: ProfileResponse = await response.json()
+      setUser(data.user)
 
       if (data.pregnancyProfile?.last_menstrual_period) {
-        setTrimester(calculateTrimester(data.pregnancyProfile.last_menstrual_period));
+        setTrimester(
+          calculateTrimester(data.pregnancyProfile.last_menstrual_period)
+        )
       } else {
-        setTrimester('No pregnancy data');
+        setTrimester('No pregnancy data')
       }
     } catch (err) {
-      console.error('Error loading user profile:', err);
-      setError('Could not load profile');
-      setTrimester('');
+      console.error('Error loading user profile:', err)
+      setError('Could not load profile')
+      setTrimester('')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   useEffect(() => {
-    fetchUserProfile();
-  }, [token]);
+    fetchUserProfile()
+  }, [token])
 
-  // Improved initials logic, handles single names gracefully
   const initials = user
     ? user.first_name.charAt(0).toUpperCase() +
       (user.last_name ? user.last_name.charAt(0).toUpperCase() : '')
-    : '';
+    : ''
 
   if (loading) {
     return (
@@ -84,7 +98,7 @@ const Header: React.FC<HeaderProps> = ({ token }) => {
         <ActivityIndicator size="small" color="#d81e5b" />
         <Text style={styles.loadingText}>Loading profile...</Text>
       </View>
-    );
+    )
   }
 
   if (error) {
@@ -95,7 +109,7 @@ const Header: React.FC<HeaderProps> = ({ token }) => {
           <Text style={styles.refreshText}>Retry</Text>
         </TouchableOpacity>
       </View>
-    );
+    )
   }
 
   return (
@@ -107,19 +121,23 @@ const Header: React.FC<HeaderProps> = ({ token }) => {
         <Text style={styles.welcomeText}>Welcome, {user?.first_name || 'Guest'}!</Text>
         {trimester ? <Text style={styles.trimesterText}>{trimester}</Text> : null}
       </View>
-      <TouchableOpacity onPress={fetchUserProfile} style={styles.refreshButton}>
-        <Text style={styles.refreshText}>Refresh</Text>
-      </TouchableOpacity>
+
+      <View style={styles.actionsContainer}>
+        <TouchableOpacity onPress={fetchUserProfile} style={styles.refreshButton}>
+          <Text style={styles.refreshText}>Refresh</Text>
+        </TouchableOpacity>
+        <NotificationBell />
+      </View>
     </View>
-  );
-};
+  )
+}
 
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 18,
-    backgroundColor: '#fff0f5', // softer pink background
+    backgroundColor: '#fff0f5',
     borderRadius: 16,
     shadowColor: '#d81e5b',
     shadowOpacity: 0.15,
@@ -170,7 +188,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   refreshButton: {
-    marginLeft: 'auto',
     backgroundColor: '#d81e5b',
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -181,6 +198,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 14,
   },
-});
+  actionsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 'auto',
+    gap: 10, // use marginLeft if gap doesn't work
+  },
+})
 
-export default Header;
+export default Header

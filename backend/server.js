@@ -123,6 +123,23 @@ io.on("connection", (socket) => {
   });
 });
 
+socket.on("delete_message", async (messageId) => {
+  try {
+    const { error } = await supabase
+      .from("messages")
+      .delete()
+      .eq("id", messageId);
+
+    if (error) throw error;
+
+    io.emit("message_deleted", messageId); // broadcast to all clients
+    console.log("🗑️ Message deleted:", messageId);
+  } catch (err) {
+    console.error("❌ Error deleting message:", err.message);
+  }
+});
+
+
 // Start server
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server is running on port ${PORT}`);

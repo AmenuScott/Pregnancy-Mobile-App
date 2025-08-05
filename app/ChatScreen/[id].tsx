@@ -4,6 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useLocalSearchParams, useRouter } from "expo-router"
 import { useEffect, useRef, useState } from "react"
 import {
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -13,7 +14,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native"
 import { setupNotification, showLocalNotification } from "../utils/notify"
 import socket from "../utils/socket"
@@ -27,13 +28,14 @@ export default function ChatScreen() {
   const [senderId, setSenderId] = useState<string | null>(null)
   const [isTyping, setIsTyping] = useState(false)
 
-  type Message = {
-    id: number
-    sender_id: string
-    receiver_id: string
-    content: string
-    timestamp?: string
-  }
+type Message = {
+  id: number;
+  sender_id: string;
+  receiver_id: string;
+  content: string;
+  timestamp?: string;
+  status?: "sending" | "sent";
+};
 
   // 🧠 Setup notifications
   useEffect(() => {
@@ -61,40 +63,35 @@ export default function ChatScreen() {
 
   // 📥 Receive messages
   useEffect(() => {
-    socket.on("receive_message", (msg) => {
-      const isMatch =
-        (msg.sender_id === senderId && msg.receiver_id === receiverId) ||
-        (msg.sender_id === receiverId && msg.receiver_id === senderId)
-      if (isMatch) {
-        setMessages((prev) => [...prev, msg])
-      } else {
-        showLocalNotification("📩 New Message", "You received a new message")
-      }
-    })
+socket.on("receive_message", (msg) => {
+  const isMatch =
+    (msg.sender_id === senderId && msg.receiver_id === receiverId) ||
+    (msg.sender_id === receiverId && msg.receiver_id === senderId);
+
+  if (isMatch) {
+    setMessages((prev) => {
+      // If it's a sent message, replace the temp one with backend one
+      const withoutTemp = prev.filter((m) => m.id !== msg.id && m.content !== msg.content);
+      return [...withoutTemp, { ...msg, status: "sent" }];
+    });
+  } else {
+    showLocalNotification("📩 New Message", "You received a new message");
+  }
+});
 
     return () => {
       socket.off("receive_message")
     }
   }, [senderId, receiverId])
 
-// 🔁 Load message history + mark as read
-useEffect(() => {
-  if (senderId && receiverId) {
-    // 1. Fetch message thread
-    fetch(`https://pregwell-backend.onrender.com/api/messages/thread/${senderId}/${receiverId}`)
-      .then((res) => res.json())
-      .then((data) => {
-        setMessages(data)
-
-        // 2. ✅ Mark messages as read from receiver → sender
-        fetch(`https://pregwell-backend.onrender.com/api/messages/mark-read/${receiverId}/${senderId}`, {
-          method: "PUT",
-        })
-      })
-      .catch((err) => console.error("❌ Fetch error:", err))
-  }
-}, [senderId, receiverId])
-
+  useEffect(() => {
+    if (!senderId || !receiverId) return
+    if (text.trim()) {
+      socket.emit("typing", { senderId, receiverId })
+    } else {
+      socket.emit("stop_typing", { senderId, receiverId })
+    }
+  }, [text])
 
   useEffect(() => {
     socket.on("typing", ({ senderId: typingUserId, receiverId: to }) => {
@@ -115,33 +112,88 @@ useEffect(() => {
     }
   }, [senderId, receiverId])
 
+  useEffect(() => {
+  socket.on("message_deleted", (deletedId) => {
+    setMessages((prev) => prev.filter((msg) => msg.id !== deletedId));
+  });
+
+  return () => {
+    socket.off("message_deleted");
+  };
+}, []);
+
+
   // 📨 Send
-  const handleSend = () => {
-    if (!text.trim() || !senderId || !receiverId) return
+const handleSend = () => {
+  if (!text.trim() || !senderId || !receiverId) return;
 
-    const message = {
-      sender_id: senderId,
-      receiver_id: receiverId,
-      content: text.trim(),
-    }
+  const tempId = Date.now(); // temporary unique ID
+  const message = {
+    id: tempId,
+    sender_id: senderId,
+    receiver_id: receiverId,
+    content: text.trim(),
+    status: "sending",
+  };
 
-    socket.emit("send_message", message)
-    setMessages((prev) => [...prev, { ...message, id: Date.now() }])
-    setText("")
-    flatListRef.current?.scrollToEnd({ animated: true })
-  }
+  // Add to UI immediately
+  setMessages((prev) => [...prev, message]);
+  socket.emit("send_message", message);
+  setText("");
+  flatListRef.current?.scrollToEnd({ animated: true });
+};
+
+const handleDelete = (id: number) => {
+  Alert.alert(
+    "Delete Message",
+    "Are you sure you want to delete this message?",
+    [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          setMessages((prev) => prev.filter((msg) => msg.id !== id));
+          socket.emit("delete_message", id); // 🔁 emits to backend
+        },
+      },
+    ]
+  );
+};
+
+
+
 
   // 💬 Render message
-  const renderItem = ({ item }: { item: Message }) => {
-    const isSender = item.sender_id === senderId
-    return (
+const renderItem = ({ item }: { item: Message }) => {
+  const isSender = item.sender_id === senderId;
+  return (
+    <TouchableOpacity onLongPress={() => handleDelete(item.id)}>
       <View style={styles.messageContainer}>
         <View style={[styles.message, isSender ? styles.sender : styles.receiver]}>
-          <Text style={[styles.messageText, isSender ? styles.senderText : styles.receiverText]}>{item.content}</Text>
+          <View style={styles.messageMeta}>
+            <Text
+              style={[
+                styles.messageText,
+                isSender ? styles.senderText : styles.receiverText,
+              ]}
+            >
+              {item.content}
+            </Text>
+
+            {isSender && (
+              <Text style={styles.tick}>
+                {item.status === "sending" ? "⏳" : "✓"}
+              </Text>
+            )}
+          </View>
         </View>
       </View>
-    )
-  }
+    </TouchableOpacity>
+  );
+};
+
+
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -164,11 +216,11 @@ useEffect(() => {
                   ?.split(" ")
                   .map((n) => n[0])
                   .join("")
-                  .toUpperCase()}
+                  .toUpperCase() || ""}
               </Text>
             </View>
             <View style={styles.userDetails}>
-              <Text style={styles.name}>{receiverName}</Text>
+              <Text style={styles.name}>{receiverName || ""}</Text>
               <Text style={styles.status}>Online</Text>
             </View>
           </View>
@@ -470,4 +522,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
   },
+
+  messageMeta: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "flex-end",
+  gap: 6,
+},
+tick: {
+  fontSize: 14,
+  color: "#ccc",
+  marginLeft: 6,
+},
+
 })
