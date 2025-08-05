@@ -80,13 +80,11 @@ app.get("/health", async (req, res) => {
 io.on("connection", (socket) => {
   console.log("✅ User connected:", socket.id);
 
-  // Join room based on user ID
   socket.on("join", (userId) => {
     socket.join(userId.toString());
     console.log(`👥 User ${userId} joined room`);
   });
 
-  // Handle sending a message
   socket.on("send_message", async (data) => {
     const { sender_id, receiver_id, content } = data;
 
@@ -99,14 +97,14 @@ io.on("connection", (socket) => {
 
       if (error) throw error;
 
-      // Send to receiver
       io.to(receiver_id.toString()).emit("receive_message", savedMessage);
       console.log(`📨 Message sent from ${sender_id} to ${receiver_id}`);
     } catch (err) {
       console.error("❌ Supabase message error:", err.message);
     }
+  });
 
-      socket.on("delete_message", async (messageId) => {
+  socket.on("delete_message", async (messageId) => {
     try {
       const { error } = await supabase
         .from("messages")
@@ -115,7 +113,7 @@ io.on("connection", (socket) => {
 
       if (error) throw error;
 
-      io.emit("message_deleted", messageId); // notify all clients
+      io.emit("message_deleted", messageId); // optional: emit to update frontend
       console.log("🗑️ Deleted message:", messageId);
     } catch (err) {
       console.error("❌ Failed to delete message:", err.message);
@@ -126,7 +124,7 @@ io.on("connection", (socket) => {
     console.log("❌ User disconnected:", socket.id);
   });
 });
-  });
+
 
   // Typing indicators
   socket.on("typing", ({ senderId, receiverId }) => {
