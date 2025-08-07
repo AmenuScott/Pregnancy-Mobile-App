@@ -173,7 +173,7 @@ export default function SymptomsScreen() {
         const userId = await AsyncStorage.getItem("userId")
         if (!token || !userId) return
 
-        const response = await fetch(`https://pregwell-backend.onrender.com/api/profile/${userId}`, {
+        const response = await fetch(`https://pregwell-backend.onrender.com/api/patients/profile/${userId}`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (!response.ok) return

@@ -2,8 +2,9 @@
 
 import { Ionicons } from "@expo/vector-icons"
 import AsyncStorage from "@react-native-async-storage/async-storage"
+import { useFocusEffect } from "@react-navigation/native"
 import { useRouter } from "expo-router"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useState } from "react"
 import {
   ActivityIndicator,
   FlatList,
@@ -46,7 +47,11 @@ const MessagesScreen = () => {
 
       if (!response.ok) throw new Error("Failed to fetch inbox")
       const data = await response.json()
-      setMessages(data) // Using the backend-provided unreadCount
+      setMessages(
+        data.sort(
+          (a: Chat, b: Chat) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )
+      ) // Using the backend-provided unreadCount
     } catch (error) {
       console.error("❌ Error fetching inbox:", error)
       setMessages([])
@@ -61,9 +66,11 @@ const MessagesScreen = () => {
     setRefreshing(false)
   }, [fetchMessages])
 
-  useEffect(() => {
-    fetchMessages()
-  }, [fetchMessages])
+  useFocusEffect(
+    useCallback(() => {
+      fetchMessages()
+    }, [fetchMessages])
+  )
 
   const filteredMessages = messages.filter((msg) =>
     msg.name?.toLowerCase().includes(search.toLowerCase())
@@ -136,7 +143,7 @@ const MessagesScreen = () => {
 
         <View style={styles.chatFooter}>
           <Text numberOfLines={2} style={styles.lastMessage}>
-            {item.content || "No messages yet"}
+            {typeof item.content === "string" ? item.content : String(item.content)}
           </Text>
           {item.unreadCount && item.unreadCount > 0 && (
             <View style={styles.unreadBadge}>

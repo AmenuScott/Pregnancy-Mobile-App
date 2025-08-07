@@ -99,7 +99,7 @@ const ProfileScreen = () => {
         const userId = await AsyncStorage.getItem("userId")
         if (!token || !userId) return
 
-        const response = await fetch(`https://pregwell-backend.onrender.com/api/profile/${userId}`, {
+        const response = await fetch(`https://pregwell-backend.onrender.com/api/patients/profile/${userId}`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (!response.ok) return
@@ -196,8 +196,9 @@ const ProfileScreen = () => {
     createBubbleAnimation(bubbleAnim2, 2000).start()
   }
 
-  const renderAnimatedCard = (index: number, children: React.ReactNode, style?: any) => (
+  const renderAnimatedCard = (index: number, children: React.ReactNode, key?: string | number, style?: any) => (
     <Animated.View
+      key={key}
       style={[
         styles.animatedCard,
         style,
@@ -297,7 +298,7 @@ const ProfileScreen = () => {
       {tips.map((tip, index) =>
         renderAnimatedCard(
           index,
-          <TouchableOpacity key={tip.id} style={styles.tipCard} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.tipCard} activeOpacity={0.7}>
             <View style={[styles.tipIconContainer, { backgroundColor: `${tip.color}20` }]}>
               <Ionicons name={tip.icon as any} size={24} color={tip.color} />
             </View>
@@ -307,6 +308,7 @@ const ProfileScreen = () => {
             </View>
             <Ionicons name="chevron-forward" size={20} color="#999" />
           </TouchableOpacity>,
+          tip.id // <-- key here
         ),
       )}
     </View>
@@ -798,12 +800,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 8,
+    marginBottom: 20,
   },
   logoutGradient: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 18,
     paddingHorizontal: 30,
     borderRadius: 15,
   },
@@ -816,6 +818,6 @@ const styles = StyleSheet.create({
   bottomSpacing: {
     height: 30,
   },
-})
+});
 
-export default ProfileScreen
+export default ProfileScreen;

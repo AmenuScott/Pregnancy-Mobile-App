@@ -57,79 +57,91 @@ export default function Signup() {
     return strength
   }
 
-const handleSignup = async () => {
-  if (!firstName || !lastName || !dob || !email || !password || !confirmPassword) {
-    Alert.alert("Missing Fields", "Please fill all fields.")
-    return
-  }
-
-  if (!validateEmail(email)) {
-    Alert.alert("Invalid Email", "Please enter a valid email address.")
-    return
-  }
-
-  if (password !== confirmPassword) {
-    Alert.alert("Password Mismatch", "Passwords do not match.")
-    return
-  }
-
-  if (getPasswordStrength(password) < 3) {
-    Alert.alert(
-      "Weak Password",
-      "Please choose a stronger password with at least 8 characters, including uppercase, lowercase, and numbers.",
-    )
-    return
-  }
-
-  if (!acceptTerms) {
-    Alert.alert("Terms & Conditions", "Please accept the terms and conditions to continue.")
-    return
-  }
-
-  setLoading(true)
-
-  try {
-    const response = await fetch("https://pregwell-backend.onrender.com/api/patients/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        first_name: firstName,
-        last_name: lastName,
-        dob,
-        email,
-        password,
-      }),
-    })
-
-    const data = await response.json()
-    console.log("Signup response:", data)
-    if (response.ok) {
-      const { token, userId, profileCompleted } = data
-
-      if (token) {
-        await AsyncStorage.setItem("token", token)
-        await AsyncStorage.setItem("user_Id", userId.toString())
-        await AsyncStorage.setItem("profileCompleted", profileCompleted?.toString() || "false")
-
-        Alert.alert("Signup Success", "Welcome! Now let's complete your profile.", [
-          {
-            text: "Continue",
-            onPress: () => router.push(`/setup?userId=${userId}`),
-          },
-        ])
-      } else {
-        Alert.alert("Signup Error", "Token missing in response.")
-      }
-    } else {
-      Alert.alert("Signup Failed", data.message || "Something went wrong.")
+  const handleSignup = async () => {
+    if (!firstName || !lastName || !dob || !email || !password || !confirmPassword) {
+      Alert.alert("Missing Fields", "Please fill all fields.")
+      return
     }
-  } catch (error) {
-    console.error("Signup error:", error)
-    Alert.alert("Error", "Network error. Please try again.")
-  }
 
-  setLoading(false)
-}
+    if (!validateEmail(email)) {
+      Alert.alert("Invalid Email", "Please enter a valid email address.")
+      return
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert("Password Mismatch", "Passwords do not match.")
+      return
+    }
+
+    if (getPasswordStrength(password) < 3) {
+      Alert.alert(
+        "Weak Password",
+        "Please choose a stronger password with at least 8 characters, including uppercase, lowercase, and numbers.",
+      )
+      return
+    }
+
+    if (!acceptTerms) {
+      Alert.alert("Terms & Conditions", "Please accept the terms and conditions to continue.")
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      const response = await fetch("https://pregwell-backend.onrender.com/api/patients/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          first_name: firstName,
+          last_name: lastName,
+          dob,
+          email,
+          password,
+        }),
+      })
+
+      let data
+      try {
+        data = await response.json()
+      } catch (jsonError) {
+        // If JSON parsing fails, log the raw response for debugging
+        const text = await response.text()
+        console.error("Signup raw response:", text)
+        Alert.alert("Signup Error", "Unexpected server response. Please try again.")
+        setLoading(false)
+        return
+      }
+
+      console.log("Signup response:", data)
+
+      if (response.ok) {
+        const { token, userId, profileCompleted } = data
+
+        if (token) {
+          await AsyncStorage.setItem("token", token)
+          await AsyncStorage.setItem("user_Id", userId.toString())
+          await AsyncStorage.setItem("profileCompleted", profileCompleted?.toString() || "false")
+
+          Alert.alert("Signup Success", "Welcome! Now let's complete your profile.", [
+            {
+              text: "Continue",
+              onPress: () => router.push(`/setup?userId=${userId}`),
+            },
+          ])
+        } else {
+          Alert.alert("Signup Error", "Token missing in response.")
+        }
+      } else {
+        Alert.alert("Signup Failed", data.message || "Something went wrong.")
+      }
+    } catch (error) {
+      console.error("Signup error:", error)
+      Alert.alert("Error", "Network error. Please try again.")
+    }
+
+    setLoading(false)
+  }
 
   const passwordStrength = getPasswordStrength(password)
   const isPasswordMatch = password && confirmPassword && password === confirmPassword

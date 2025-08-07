@@ -35,15 +35,24 @@ export default function NewChatsScreen() {
         const token = await AsyncStorage.getItem("token")
         const userId = await AsyncStorage.getItem("userId")
 
-        const response = await fetch("https://pregwell-backend.onrender.com/api/patients", {
+        const response = await fetch("https://pregwell-backend.onrender.com/api/patients/patients", {
           headers: { Authorization: `Bearer ${token}` },
         })
 
         if (!response.ok) throw new Error("Failed to fetch users")
         const data = await response.json()
 
-        // Exclude current user from contacts
-        setContacts(data.filter((u: { id: string | null }) => u.id !== userId))
+        // Map backend fields to Contact type
+        const mappedContacts = data
+          .filter((u: any) => String(u.id) !== String(userId))
+          .map((u: any) => ({
+            id: String(u.id),
+            name: u.name || "Unknown",
+            avatar: u.avatar || null,
+            online: !!u.online,
+          }))
+
+        setContacts(mappedContacts)
       } catch (err) {
         console.error("Fetch error:", err)
         setContacts([])
