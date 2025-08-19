@@ -205,7 +205,7 @@ const Card = ({ title, subtitle, icon, colors, onPress, unreadCount }: CardProps
   <TouchableOpacity style={s.card} onPress={onPress}>
     <LinearGradient colors={colors} style={s.cardContent}>
       <View style={s.iconContainer}>
-        <Ionicons name={icon as any} size={28} color={typeof colors[0] === "string" ? colors[0].replace(/[^#]/g, "").slice(0, 7) : "#000"} />
+        <Ionicons name={icon as any} size={28} color="#6c5ce7" />
       </View>
       <Text style={s.cardTitle}>{title}</Text>
       <Text style={s.cardSubtitle}>{subtitle}</Text>
@@ -453,7 +453,7 @@ const HomeScreen = () => {
 
         <Section
           title="Health & Wellness"
-          icon="medical"
+          icon="medkit-outline"
           cards={[
             {
               title: "Symptom Check",
@@ -474,7 +474,7 @@ const HomeScreen = () => {
 
         <Section
           title="Lifestyle"
-          icon="leaf"
+          icon="leaf-outline"
           cards={[
             {
               title: "Nutrition",
@@ -495,7 +495,7 @@ const HomeScreen = () => {
 
         <Section
           title="Community"
-          icon="people"
+          icon="people-outline"
           cards={[
             {
               title: "AI Assistant",
