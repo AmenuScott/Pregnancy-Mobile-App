@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useFocusEffect } from "@react-navigation/native"
 import { useRouter } from "expo-router"
-import { useCallback, useState } from "react"
+import { useCallback, useState, useEffect } from "react"
 import {
   ActivityIndicator,
   FlatList,
@@ -18,6 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native"
+import socket from "./utils/socket"
 
 type Chat = {
   id: string
@@ -51,7 +52,7 @@ const MessagesScreen = () => {
         data.sort(
           (a: Chat, b: Chat) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )
-      ) // Using the backend-provided unreadCount
+      )
     } catch (error) {
       console.error("❌ Error fetching inbox:", error)
       setMessages([])
@@ -60,17 +61,96 @@ const MessagesScreen = () => {
     }
   }, [])
 
+  // 📖 Mark all messages as read
+  const markAllMessagesAsRead = useCallback(async () => {
+    try {
+      const token = await AsyncStorage.getItem("token")
+      const userId = await AsyncStorage.getItem("userId")
+      if (!token || !userId) return
+
+      // Mark all unread messages as read
+      const unreadChats = messages.filter(chat => chat.unreadCount && chat.unreadCount > 0)
+      
+      for (const chat of unreadChats) {
+        await fetch(`https://pregwell-backend.onrender.com/api/messages/mark-read/${chat.id}/${userId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+      }
+
+      // Emit socket event to update other clients
+      unreadChats.forEach(chat => {
+        socket.emit('messages_read', { senderId: chat.id, receiverId: userId })
+      })
+    } catch (error) {
+      console.error("❌ Error marking all messages as read:", error)
+    }
+  }, [messages])
+
+  // 🔄 Refresh messages when returning to screen
+  useFocusEffect(
+    useCallback(() => {
+      fetchMessages()
+      // Mark all messages as read when opening Messages screen
+      markAllMessagesAsRead()
+    }, [fetchMessages, markAllMessagesAsRead])
+  )
+
+  // 📡 Real-time updates for unread counts
+  useEffect(() => {
+    const userId = AsyncStorage.getItem("userId")
+    
+    // Listen for messages being read
+    socket.on("messages_read", ({ senderId, receiverId }: { senderId: string; receiverId: string }) => {
+      userId.then(id => {
+        if (receiverId === id) {
+          // Update unread count for this chat
+          setMessages(prev => 
+            prev.map(chat => 
+              chat.id === senderId 
+                ? { ...chat, unreadCount: 0 }
+                : chat
+            )
+          )
+        }
+      })
+    })
+
+    // Listen for new messages
+    socket.on("receive_message", (msg: any) => {
+      userId.then(id => {
+        if (msg.receiver_id === id) {
+          // Update unread count for sender
+          setMessages(prev => 
+            prev.map(chat => 
+              chat.id === msg.sender_id 
+                ? { 
+                    ...chat, 
+                    unreadCount: (chat.unreadCount || 0) + 1,
+                    content: msg.content,
+                    created_at: msg.created_at || new Date().toISOString()
+                  }
+                : chat
+            )
+          )
+        }
+      })
+    })
+
+    return () => {
+      socket.off("messages_read")
+      socket.off("receive_message")
+    }
+  }, [])
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
     await fetchMessages()
     setRefreshing(false)
   }, [fetchMessages])
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchMessages()
-    }, [fetchMessages])
-  )
 
   const filteredMessages = messages.filter((msg) =>
     msg.name?.toLowerCase().includes(search.toLowerCase())

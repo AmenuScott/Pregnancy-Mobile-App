@@ -1,8 +1,8 @@
 "use client"
 
 import AsyncStorage from "@react-native-async-storage/async-storage"
-import { useLocalSearchParams, useRouter } from "expo-router"
-import { useEffect, useRef, useState } from "react"
+import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router"
+import { useEffect, useRef, useState, useCallback } from "react"
 import {
   Alert,
   FlatList,
@@ -16,6 +16,7 @@ import {
   TouchableOpacity,
   View
 } from "react-native"
+import { Ionicons } from "@expo/vector-icons"
 import { setupNotification, showLocalNotification } from "../utils/notify"
 import socket from "../utils/socket"
 
@@ -27,6 +28,11 @@ export default function ChatScreen() {
   const { id: receiverId, receiverName } = useLocalSearchParams()
   const [senderId, setSenderId] = useState<string | null>(null)
   const [isTyping, setIsTyping] = useState(false)
+
+  // Ensure receiverId is a string
+  const receiverIdString = Array.isArray(receiverId) ? receiverId[0] : receiverId
+  // Ensure receiverName is a string
+  const receiverNameString = Array.isArray(receiverName) ? receiverName[0] : receiverName
 
 type Message = {
   id: number;
@@ -51,30 +57,72 @@ type Message = {
     })()
   }, [])
 
-  // 🔁 Load message history
+  // 📖 Mark messages as read
+  const markMessagesAsRead = useCallback(async () => {
+    if (!senderId || !receiverIdString) return
+    
+    try {
+      const token = await AsyncStorage.getItem("token")
+      if (!token) return
+
+      await fetch(`https://pregwell-backend.onrender.com/api/messages/mark-read/${receiverIdString}/${senderId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      // Emit socket event to update other clients
+      socket.emit('messages_read', { senderId: receiverIdString, receiverId: senderId })
+    } catch (error) {
+      console.error("❌ Error marking messages as read:", error)
+    }
+  }, [senderId, receiverIdString])
+
+  // 🔁 Load message history and mark as read
   useEffect(() => {
-    if (senderId && receiverId) {
-      fetch(`https://pregwell-backend.onrender.com/api/messages/thread/${senderId}/${receiverId}`)
+    if (senderId && receiverIdString) {
+      fetch(`https://pregwell-backend.onrender.com/api/messages/thread/${senderId}/${receiverIdString}`)
         .then((res) => res.json())
         .then((data) => setMessages(data))
         .catch((err) => console.error("❌ Fetch error:", err))
+      
+      // Mark messages as read when opening chat
+      markMessagesAsRead()
     }
-  }, [senderId, receiverId])
+  }, [senderId, receiverIdString, markMessagesAsRead])
 
   // 📥 Receive messages
   useEffect(() => {
-socket.on("receive_message", (msg) => {
+socket.on("receive_message", async (msg: any) => {
   const isMatch =
-    (msg.sender_id === senderId && msg.receiver_id === receiverId) ||
-    (msg.sender_id === receiverId && msg.receiver_id === senderId);
+    (msg.sender_id === senderId && msg.receiver_id === receiverIdString) ||
+    (msg.sender_id === receiverIdString && msg.receiver_id === senderId);
 
   if (isMatch) {
     setMessages((prev) => {
       // If it's a sent message, replace the temp one with backend one
       const withoutTemp = prev.filter((m) => m.id !== msg.id && m.content !== msg.content);
-      return [...withoutTemp, { ...msg, status: "sent" }];
+      const newMessage: Message = { 
+        id: msg.id,
+        sender_id: msg.sender_id,
+        receiver_id: msg.receiver_id,
+        content: msg.content,
+        status: "sent"
+      };
+      return [...withoutTemp, newMessage];
     });
+    
+    // Mark new messages as read immediately if chat is open
+    if (msg.sender_id === receiverIdString) {
+      markMessagesAsRead()
+    }
   } else {
+    // Save notification for messages from other chats
+    if (msg.receiver_id === senderId) {
+      await saveReceivedMessageNotification(msg);
+    }
     showLocalNotification("📩 New Message", "You received a new message");
   }
 });
@@ -82,26 +130,98 @@ socket.on("receive_message", (msg) => {
     return () => {
       socket.off("receive_message")
     }
-  }, [senderId, receiverId])
+  }, [senderId, receiverIdString, markMessagesAsRead])
+
+// 📱 Save notification for received message
+const saveReceivedMessageNotification = async (msg: any) => {
+  try {
+    const token = await AsyncStorage.getItem("token");
+    if (!token) return;
+
+    // Get sender name
+    const senderName = msg.sender_name || "Someone";
+    
+    // Save to notifications
+    await fetch("https://pregwell-backend.onrender.com/api/notifications", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        user_id: senderId,
+        title: `New message from ${senderName}`,
+        message: msg.content,
+        type: "message",
+        related_data: { sender_id: msg.sender_id, chat_id: msg.sender_id }
+      })
+    });
+  } catch (error) {
+    console.error("Error saving notification:", error);
+  }
+};
+
+// 🔔 Handle background message notifications
+const handleBackgroundMessage = async (msg: any) => {
+  if (msg.receiver_id === senderId && msg.sender_id !== receiverIdString) {
+    // Message from someone else - save notification
+    await saveReceivedMessageNotification(msg);
+    
+    // Show push notification
+    showLocalNotification(
+      `New message from ${msg.sender_name || "Someone"}`,
+      msg.content
+    );
+  }
+};
+
+// 📱 Setup message notification listeners
+useEffect(() => {
+  // Listen for messages when app is in background
+  socket.on("receive_message", handleBackgroundMessage);
+  
+  return () => {
+    socket.off("receive_message", handleBackgroundMessage);
+  };
+}, [senderId, receiverIdString]);
+
+  // 🔄 Refresh messages when returning to chat
+  useFocusEffect(
+    useCallback(() => {
+      if (senderId && receiverIdString) {
+        markMessagesAsRead()
+      }
+    }, [senderId, receiverIdString, markMessagesAsRead])
+  )
+
+  // 🔄 Refresh when leaving chat
+  useEffect(() => {
+    return () => {
+      // Mark messages as read when leaving chat
+      if (senderId && receiverIdString) {
+        markMessagesAsRead()
+      }
+    }
+  }, [senderId, receiverIdString, markMessagesAsRead])
 
   useEffect(() => {
-    if (!senderId || !receiverId) return
+    if (!senderId || !receiverIdString) return
     if (text.trim()) {
-      socket.emit("typing", { senderId, receiverId })
+      socket.emit("typing", { senderId, receiverId: receiverIdString })
     } else {
-      socket.emit("stop_typing", { senderId, receiverId })
+      socket.emit("stop_typing", { senderId, receiverId: receiverIdString })
     }
-  }, [text])
+  }, [text, senderId, receiverIdString])
 
   useEffect(() => {
     socket.on("typing", ({ senderId: typingUserId, receiverId: to }) => {
-      if (to === senderId && typingUserId === receiverId) {
+      if (to === senderId && typingUserId === receiverIdString) {
         setIsTyping(true)
       }
     })
 
     socket.on("stop_typing", ({ senderId: typingUserId, receiverId: to }) => {
-      if (to === senderId && typingUserId === receiverId) {
+      if (to === senderId && typingUserId === receiverIdString) {
         setIsTyping(false)
       }
     })
@@ -110,7 +230,7 @@ socket.on("receive_message", (msg) => {
       socket.off("typing")
       socket.off("stop_typing")
     }
-  }, [senderId, receiverId])
+  }, [senderId, receiverIdString])
 
   useEffect(() => {
   socket.on("message_deleted", (deletedId) => {
@@ -124,14 +244,14 @@ socket.on("receive_message", (msg) => {
 
 
   // 📨 Send
-const handleSend = () => {
-  if (!text.trim() || !senderId || !receiverId) return;
+const handleSend = async () => {
+  if (!text.trim() || !senderId || !receiverIdString) return;
 
   const tempId = Date.now(); // temporary unique ID
-  const message = {
+  const message: Message = {
     id: tempId,
     sender_id: senderId,
-    receiver_id: receiverId,
+    receiver_id: receiverIdString,
     content: text.trim(),
     status: "sending",
   };
@@ -139,8 +259,41 @@ const handleSend = () => {
   // Add to UI immediately
   setMessages((prev) => [...prev, message]);
   socket.emit("send_message", message);
+  
+  // Send notification to receiver
+  await sendNotificationToReceiver(receiverIdString, text.trim());
+  
   setText("");
   flatListRef.current?.scrollToEnd({ animated: true });
+};
+
+// 📱 Send notification to receiver
+const sendNotificationToReceiver = async (receiverId: string, messageContent: string) => {
+  try {
+    const token = await AsyncStorage.getItem("token");
+    if (!token) return;
+
+    const senderName = receiverNameString || "Someone";
+    
+    // Save notification to backend
+    await fetch("https://pregwell-backend.onrender.com/api/notifications", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        user_id: receiverId,
+        title: `New message from ${senderName}`,
+        message: messageContent,
+        type: "message",
+        related_data: { sender_id: senderId, chat_id: receiverIdString }
+      })
+    });
+
+  } catch (error) {
+    console.error("Error sending notification:", error);
+  }
 };
 
 const handleDelete = (id: number) => {
@@ -205,27 +358,13 @@ const renderItem = ({ item }: { item: Message }) => {
       >
         {/* 🧭 HEADER */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButtonContainer} onPress={() => router.back()} activeOpacity={0.7}>
-            <Text style={styles.backButton}>←</Text>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#2d3436" />
           </TouchableOpacity>
-
-          <View style={styles.userInfo}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {receiverName
-                  ?.split(" ")
-                  .map((n) => n[0])
-                  .join("")
-                  .toUpperCase() || ""}
-              </Text>
-            </View>
-            <View style={styles.userDetails}>
-              <Text style={styles.name}>{receiverName || ""}</Text>
-              <Text style={styles.status}>Online</Text>
-            </View>
-          </View>
-
-          <View style={styles.onlineDot} />
+          <Text style={styles.headerTitle}>{receiverNameString || "Chat"}</Text>
+          <TouchableOpacity style={styles.moreButton}>
+            <Ionicons name="ellipsis-vertical" size={24} color="#2d3436" />
+          </TouchableOpacity>
         </View>
 
         {/* 💬 Messages */}
@@ -244,7 +383,7 @@ const renderItem = ({ item }: { item: Message }) => {
         {isTyping && (
           <View style={styles.typingContainer}>
             <View style={styles.typingBubble}>
-              <Text style={styles.typingText}>{receiverName} is typing</Text>
+              <Text style={styles.typingText}>{receiverNameString} is typing</Text>
               <View style={styles.typingDots}>
                 <View style={[styles.dot, styles.dot1]} />
                 <View style={[styles.dot, styles.dot2]} />
@@ -288,39 +427,28 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "#fff",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 16, // Increased padding
-    paddingTop: Platform.OS === "android" ? 20 : 16, // Extra padding for Android
-    backgroundColor: "#fff",
+    paddingHorizontal: 20,
+    paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: "#e9ecef",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  backButtonContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f8f9fa",
+    borderBottomColor: "#e0e0e0",
+    backgroundColor: "#fff",
   },
   backButton: {
-    fontSize: 20,
-    color: "#6c5ce7",
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 18,
     fontWeight: "600",
+    color: "#2d3436",
+  },
+  moreButton: {
+    padding: 8,
   },
   userInfo: {
     flex: 1,
