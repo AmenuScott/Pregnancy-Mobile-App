@@ -107,7 +107,7 @@ const fetchAllData = useCallback(async () => {
       return
     }
 
-    const profileRes = await fetch(`https://pregwell-backend.onrender.com/api/profile/${id}`)
+    const profileRes = await fetch(`https://pregwell-backend.onrender.com/api/patients/profile/${id}`)
     if (!profileRes.ok) {
       throw new Error(`Failed to fetch profile: ${profileRes.status}`)
     }
