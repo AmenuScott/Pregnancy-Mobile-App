@@ -9,7 +9,9 @@ interface Props {
 }
 
 const ProfileHeader: React.FC<Props> = ({ name, backgroundColor = "#ffffff55", style }) => {
-  const initials = name
+  // Add safety check for name
+  const safeName = name || "User";
+  const initials = safeName
     .split(" ")
     .map((n) => n[0])
     .join("")

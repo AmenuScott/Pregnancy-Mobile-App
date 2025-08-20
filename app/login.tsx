@@ -16,7 +16,8 @@ import {
   View,
 } from "react-native";
 
-import AsyncStorage from "@react-native-async-storage/async-storage"; // import AsyncStorage
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { setAuthData } from "./utils/authUtils";
 
 export default function Login() {
   const router = useRouter();
@@ -52,12 +53,14 @@ const handleLogin = async () => {
         return;
       }
 
-      await AsyncStorage.setItem("token", token);
-      await AsyncStorage.setItem("userId", userId.toString());
-      await AsyncStorage.setItem(
-        "profileCompleted",
-        (profileCompleted === true || profileCompleted === "true") ? "true" : "false"
-      );
+      // Validate and store authentication data safely
+      const authStored = await setAuthData(token, userId, profileCompleted);
+      
+      if (!authStored) {
+        Alert.alert("Storage Error", "Failed to save login data. Please try again.");
+        setLoading(false);
+        return;
+      }
 
       Alert.alert("Success", "Login successful!");
 
