@@ -28,7 +28,7 @@
     "dotenv": "^16.6.1",
     "expo": "~53.0.9",
     "expo-auth-session": "~6.2.1",
-    "expo-blur": "~14.1.4",
+    "expo-blur": "~12.9.1",
     "expo-checkbox": "~4.1.4",
     "expo-constants": "~17.1.6",
     "expo-device": "~7.1.4",
