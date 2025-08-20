@@ -14,14 +14,16 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  Alert
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Sample initial messages
 const initialMessages = [
   {
     id: "1",
-    text: "Hello! I'm your pregnancy assistant. How can I help you today?",
+    text: "Hello! I'm PregWell, your pregnancy assistant. I'm here to help you with pregnancy-related questions, nutrition advice, exercise tips, and general guidance. How can I assist you today?",
     sender: "bot",
     timestamp: new Date(Date.now() - 1000 * 60 * 5), // 5 minutes ago
   },
@@ -31,22 +33,22 @@ const initialMessages = [
 const suggestedQuestions = [
   {
     id: "1",
-    text: "What foods should I avoid?",
+    text: "What foods should I avoid during pregnancy?",
     category: "nutrition",
   },
   {
     id: "2",
-    text: "Is my symptom normal?",
+    text: "Is morning sickness normal?",
     category: "health",
   },
   {
     id: "3",
-    text: "Safe exercises for 2nd trimester?",
+    text: "What exercises are safe in the second trimester?",
     category: "fitness",
   },
   {
     id: "4",
-    text: "How to relieve back pain?",
+    text: "How can I relieve back pain?",
     category: "comfort",
   },
   {
@@ -56,22 +58,14 @@ const suggestedQuestions = [
   },
 ];
 
-// Sample responses for demo purposes
-const sampleResponses = {
-  "what foods should i avoid?": "During pregnancy, it's best to avoid:\n\n• Raw or undercooked meat, poultry, fish, and eggs\n• Unpasteurized dairy products\n• High-mercury fish like shark, swordfish, and mackerel\n• Raw sprouts\n• Excessive caffeine\n• Alcohol\n\nWould you like more specific information about any of these?",
-  "is my symptom normal?": "Many symptoms can be normal during pregnancy, including nausea, fatigue, back pain, and swelling. However, without knowing your specific symptom, I can't give personalized advice. Could you tell me what symptom you're experiencing?",
-  "safe exercises for 2nd trimester?": "Great question! Safe exercises during your 2nd trimester include:\n\n• Walking\n• Swimming\n• Prenatal yoga\n• Stationary cycling\n• Low-impact aerobics\n• Modified strength training\n\nRemember to avoid exercises that require lying flat on your back and activities with a high risk of falling or abdominal trauma.",
-  "how to relieve back pain?": "For pregnancy back pain relief, try:\n\n• Gentle stretching\n• Prenatal yoga\n• Proper posture\n• Supportive maternity belt\n• Warm (not hot) compress\n• Prenatal massage\n• Swimming\n• Sleeping with a pregnancy pillow\n\nIf pain is severe or includes other symptoms, please consult your healthcare provider.",
-  "when should i call my doctor?": "Contact your doctor immediately if you experience:\n\n• Vaginal bleeding\n• Severe abdominal pain\n• Severe headache or vision changes\n• Fever over 100.4°F (38°C)\n• Rapid swelling of face, hands, or feet\n• Decreased fetal movement\n• Contractions before 37 weeks\n• Fluid leaking from vagina\n• Persistent vomiting",
-};
-
 const MyAIScreen = () => {
   const router = useRouter();
   const [messages, setMessages] = useState(initialMessages);
   const [inputText, setInputText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const flatListRef = useRef(null);
-  const inputRef = useRef(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const flatListRef = useRef<FlatList>(null);
+  const inputRef = useRef<TextInput>(null);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
@@ -105,7 +99,92 @@ const MyAIScreen = () => {
     };
   }, []);
 
-  const handleSend = () => {
+  // 📱 Send message to AI chatbot
+  const sendToAI = async (question: string) => {
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token) {
+        throw new Error("Authentication required");
+      }
+
+      const response = await fetch("https://pregwell-backend.onrender.com/api/chat/ask", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ question }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to get AI response");
+      }
+
+      const data = await response.json();
+      return data.answer;
+    } catch (error) {
+      console.error("AI Chat Error:", error);
+      throw error;
+    }
+  };
+
+  // 💾 Save chat history to AsyncStorage
+  const saveChatHistory = async (chatMessages: any[]) => {
+    try {
+      await AsyncStorage.setItem("pregwell_chat_history", JSON.stringify(chatMessages));
+    } catch (error) {
+      console.error("Failed to save chat history:", error);
+    }
+  };
+
+  // 📖 Load chat history from AsyncStorage
+  const loadChatHistory = async () => {
+    try {
+      const savedHistory = await AsyncStorage.getItem("pregwell_chat_history");
+      if (savedHistory) {
+        const parsedHistory = JSON.parse(savedHistory);
+        // Only load if we have more than just the initial message
+        if (parsedHistory.length > 1) {
+          setMessages(parsedHistory);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load chat history:", error);
+    }
+  };
+
+  // 🔄 Load chat history on component mount
+  useEffect(() => {
+    loadChatHistory();
+  }, []);
+
+  // 💾 Save chat history whenever messages change
+  useEffect(() => {
+    if (messages.length > 1) {
+      saveChatHistory(messages);
+    }
+  }, [messages]);
+
+  // 🗑️ Clear chat history
+  const clearChat = () => {
+    Alert.alert(
+      "Clear Chat History",
+      "Are you sure you want to clear all chat messages? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: () => {
+            setMessages(initialMessages);
+            AsyncStorage.removeItem("pregwell_chat_history");
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSend = async () => {
     if (inputText.trim() === "") return;
 
     // Add user message
@@ -119,41 +198,53 @@ const MyAIScreen = () => {
     setMessages(prevMessages => [...prevMessages, userMessage]);
     setInputText("");
     setIsTyping(true);
+    setIsLoading(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const lowerCaseInput = inputText.toLowerCase().trim();
-      let responseText = "I'm not sure how to respond to that. Could you try asking something about pregnancy nutrition, symptoms, exercise, or when to contact your doctor?";
+    try {
+      // Get AI response
+      const aiResponse = await sendToAI(inputText);
       
-      // Check for matching responses
-      Object.keys(sampleResponses).forEach(key => {
-        if (lowerCaseInput.includes(key) || key.includes(lowerCaseInput)) {
-          responseText = sampleResponses[key];
-        }
-      });
-
       const botMessage = {
         id: (Date.now() + 1).toString(),
-        text: responseText,
+        text: aiResponse,
         sender: "bot",
         timestamp: new Date(),
       };
       
       setMessages(prevMessages => [...prevMessages, botMessage]);
+    } catch (error) {
+      // Show error message
+      const errorMessage = {
+        id: (Date.now() + 1).toString(),
+        text: "I'm sorry, I'm having trouble connecting right now. Please check your internet connection and try again. For urgent medical questions, please contact your healthcare provider.",
+        sender: "bot",
+        timestamp: new Date(),
+      };
+      
+      setMessages(prevMessages => [...prevMessages, errorMessage]);
+      
+      // Show alert for debugging
+      Alert.alert(
+        "Connection Error",
+        "Failed to connect to AI service. Please try again.",
+        [{ text: "OK" }]
+      );
+    } finally {
       setIsTyping(false);
-    }, 1500);
+      setIsLoading(false);
+    }
   };
 
-  const handleSuggestedQuestion = (question) => {
+  const handleSuggestedQuestion = (question: { text: string }) => {
     setInputText(question.text);
-    inputRef.current.focus();
+    inputRef.current?.focus();
   };
 
-  const formatTime = (date) => {
+  const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const renderMessage = ({ item }) => {
+  const renderMessage = ({ item }: { item: any }) => {
     const isBot = item.sender === "bot";
     
     return (
@@ -193,7 +284,7 @@ const MyAIScreen = () => {
     );
   };
 
-  const renderSuggestedQuestion = ({ item }) => (
+  const renderSuggestedQuestion = ({ item }: { item: any }) => (
     <TouchableOpacity 
       style={styles.suggestedQuestionButton}
       onPress={() => handleSuggestedQuestion(item)}
@@ -230,8 +321,8 @@ const MyAIScreen = () => {
                 <Text style={styles.activeText}>Online</Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.infoButton}>
-              <Ionicons name="information-circle" size={24} color="white" />
+            <TouchableOpacity style={styles.infoButton} onPress={clearChat}>
+              <Ionicons name="trash-outline" size={24} color="white" />
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -244,8 +335,8 @@ const MyAIScreen = () => {
         renderItem={renderMessage}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.messagesContainer}
-        onContentSizeChange={() => flatListRef.current.scrollToEnd({ animated: true })}
-        onLayout={() => flatListRef.current.scrollToEnd({ animated: true })}
+        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+        onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
       />
 
       {/* Typing Indicator */}
@@ -256,7 +347,19 @@ const MyAIScreen = () => {
             <View style={[styles.typingDot, styles.typingDotMiddle]} />
             <View style={styles.typingDot} />
           </View>
-          <Text style={styles.typingText}>Assistant is typing...</Text>
+          <Text style={styles.typingText}>PregWell is thinking...</Text>
+        </View>
+      )}
+
+      {/* Loading Indicator */}
+      {isLoading && (
+        <View style={styles.loadingContainer}>
+          <View style={styles.loadingBubble}>
+            <View style={styles.loadingDot} />
+            <View style={[styles.loadingDot, styles.loadingDotMiddle]} />
+            <View style={styles.loadingDot} />
+          </View>
+          <Text style={styles.loadingText}>Connecting to AI...</Text>
         </View>
       )}
 
@@ -530,6 +633,37 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: "#F0F0F0",
+  },
+  loadingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: 60,
+    marginBottom: 16,
+  },
+  loadingBubble: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F1F1F1",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    marginRight: 8,
+  },
+  loadingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#9C27B0",
+    marginHorizontal: 2,
+    opacity: 0.6,
+  },
+  loadingDotMiddle: {
+    opacity: 0.8,
+    transform: [{ scale: 1.2 }],
+  },
+  loadingText: {
+    fontSize: 12,
+    color: "#A0A0A0",
   },
 });
 

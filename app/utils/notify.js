@@ -20,7 +20,7 @@ export const setupNotification = async () => {
   }
 }
 
-export const showLocalNotification = (title: string, body: string) => {
+export const showLocalNotification = (title, body) => {
   Notifications.scheduleNotificationAsync({
     content: {
       title,

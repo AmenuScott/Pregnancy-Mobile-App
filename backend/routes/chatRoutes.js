@@ -1,12 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Configuration, OpenAIApi } = require('openai');
-
-// Load your OpenAI key from environment variable
-const configuration = new Configuration({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-const openai = new OpenAIApi(configuration);
+const OpenAI = require('openai');
 
 // AI chat endpoint
 router.post('/ask', async (req, res) => {
@@ -17,21 +11,39 @@ router.post('/ask', async (req, res) => {
   }
 
   try {
-    const completion = await openai.createChatCompletion({
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return res.status(503).json({ error: 'OPENAI_API_KEY is not configured on the server' });
+    }
+
+    const openai = new OpenAI({ apiKey });
+
+    const completion = await openai.chat.completions.create({
       model: 'gpt-3.5-turbo',
       messages: [
         {
           role: 'system',
-          content: 'You are a helpful medical assistant focused on pregnancy-related symptoms.',
+          content: `You are PregWell, a knowledgeable and compassionate pregnancy assistant. You provide accurate, helpful, and supportive information about pregnancy, childbirth, and early parenting.
+
+Your responses should be:
+- Informative and evidence-based
+- Warm and supportive
+- Easy to understand
+- Focused on pregnancy-related topics
+- Safe and encouraging
+
+Always remind users to consult their healthcare provider for personalized medical advice.`,
         },
         {
           role: 'user',
           content: question,
         },
       ],
+      max_tokens: 500,
+      temperature: 0.7,
     });
 
-    const aiResponse = completion.data.choices[0].message.content;
+    const aiResponse = completion.choices[0].message.content;
     res.status(200).json({ answer: aiResponse });
   } catch (error) {
     console.error('OpenAI API Error:', error);

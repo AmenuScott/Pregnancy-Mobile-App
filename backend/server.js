@@ -25,6 +25,7 @@ const personalizedRoutes = require("./routes/personalizedRoutes");
 const babyProfileRoutes = require("./routes/babyProfileRoutes");
 const dietRoutes = require("./routes/dietRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+const chatRoutes = require("./routes/chatRoutes");
 
 const app = express();
 const server = http.createServer(app);
@@ -59,6 +60,7 @@ app.use(personalizedRoutes);
 app.use("/api", babyProfileRoutes);
 app.use(dietRoutes);
 app.use(notificationRoutes);
+app.use("/api/chat", chatRoutes);
 
 // Base route
 app.get("/", (req, res) => {
@@ -102,6 +104,27 @@ io.on("connection", (socket) => {
       console.log(`📨 Message from ${sender_id} → ${receiver_id}`);
     } catch (err) {
       console.error("❌ Supabase message error:", err.message);
+    }
+  });
+
+  // Mark messages as read
+  socket.on("messages_read", async (data) => {
+    const { senderId, receiverId } = data;
+    
+    try {
+      // Update messages in database
+      const { error } = await supabase
+        .from("messages")
+        .update({ is_read: true })
+        .match({ sender_id: senderId, receiver_id: receiverId, is_read: false });
+
+      if (error) throw error;
+
+      // Notify all clients about the read status
+      io.emit("messages_read", { senderId, receiverId });
+      console.log(`📖 Messages marked as read: ${senderId} → ${receiverId}`);
+    } catch (err) {
+      console.error("❌ Error marking messages as read:", err.message);
     }
   });
 
