@@ -21,7 +21,7 @@ const s = StyleSheet.create({
   header: {
     paddingBottom: 20,
     paddingHorizontal: 20,
-    paddingTop: 55,
+    paddingTop: 20,
     borderBottomLeftRadius: 15,
     borderBottomRightRadius: 15,
     shadowColor: "#000",
@@ -468,40 +468,43 @@ const HomeScreen = () => {
   const fullName = `${userData?.firstName || ""} ${userData?.lastName || ""}`.trim()
 
   return (
-    <View style={s.container}>
+    <SafeAreaView style={s.container}>
       <LinearGradient colors={["#E0BBFF", "#9C27B0", "#7B1FA2"]} style={s.header}>
-        <SafeAreaView>
-          <View style={s.headerTop}>
-            <TouchableOpacity onPress={() => router.push("/Profile")}>
-              <ProfileHeader name={fullName} profilePicture={userData?.profilePicture} />
-            </TouchableOpacity>
-            <TouchableOpacity style={s.notificationButton} onPress={() => router.push("/Notification")}>
-              <View style={s.notificationBadge}>
-                <Ionicons name="notifications" size={22} color="#9C27B0" />
-                <View style={s.notificationDot} />
-              </View>
-            </TouchableOpacity>
-          </View>
-          <View style={s.greeting}>
-            <Text style={s.greetingText}>Welcome {firstName}! 🌺</Text>
-            <Text style={s.subGreeting}>How are you feeling today?</Text>
-          </View>
-          <LinearGradient colors={["rgba(255,255,255,0.3)", "rgba(255,255,255,0.1)"]} style={s.trimesterPill}>
-            <Ionicons name="flower" size={16} color="white" />
-            <Text style={s.trimesterText}>
-              {pregnancyData
-                ? `${pregnancyData.trimesterText} • Week ${pregnancyData.totalWeeks}`
-                : "Your Journey"}
-            </Text>
-          </LinearGradient>
-        </SafeAreaView>
+        <View style={s.headerTop}>
+          <TouchableOpacity onPress={() => router.push("/Profile")}>
+            <ProfileHeader name={fullName} profilePicture={userData?.profilePicture} />
+          </TouchableOpacity>
+          <TouchableOpacity style={s.notificationButton} onPress={() => router.push("/Notification")}>
+            <View style={s.notificationBadge}>
+              <Ionicons name="notifications" size={22} color="#9C27B0" />
+              <View style={s.notificationDot} />
+            </View>
+          </TouchableOpacity>
+        </View>
+        <View style={s.greeting}>
+          <Text style={s.greetingText}>Welcome {firstName}! 🌺</Text>
+          <Text style={s.subGreeting}>How are you feeling today?</Text>
+        </View>
+        <LinearGradient colors={["rgba(255,255,255,0.3)", "rgba(255,255,255,0.1)"]} style={s.trimesterPill}>
+          <Ionicons name="flower" size={16} color="white" />
+          <Text style={s.trimesterText}>
+            {pregnancyData
+              ? `${pregnancyData.trimesterText} • Week ${pregnancyData.totalWeeks}`
+              : "Your Journey"}
+          </Text>
+        </LinearGradient>
       </LinearGradient>
 
       <ScrollView
         style={s.scroll}
-        contentContainerStyle={{ paddingBottom: 40, paddingTop: 10 }}
+        contentContainerStyle={{ paddingBottom: 40, paddingTop: 10, flexGrow: 1 }}
         showsVerticalScrollIndicator={false}
       >
+        {/* Debug: Test if content is rendering */}
+        <Text style={{ padding: 20, fontSize: 16, textAlign: 'center', backgroundColor: '#fff', margin: 20, borderRadius: 10 }}>
+          🔍 Content is loading... {userData ? 'User data loaded' : 'Loading user data'}
+        </Text>
+        
         {/* Tracker Card */}
         <View style={s.tracker}>
           <LinearGradient colors={["#FFE4E6", "#FFF0F3"]} style={s.trackerContent}>
@@ -709,4 +712,7 @@ const HomeScreenWithErrorBoundary = () => (
   </ErrorBoundary>
 )
 
-export default HomeScreenWithErrorBoundary
+// Temporary simple version for testing
+import HomeTest from './HomeTest';
+
+export default HomeTest // Temporarily use simple version
