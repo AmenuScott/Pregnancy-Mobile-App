@@ -2,6 +2,7 @@
 
 import { Ionicons } from "@expo/vector-icons"
 import AsyncStorage from "@react-native-async-storage/async-storage"
+import { getAuthData, clearAuthData } from "./utils/authUtils"
 import { BlurView } from "expo-blur"
 import { LinearGradient } from "expo-linear-gradient"
 import { useRouter } from "expo-router"
@@ -9,6 +10,7 @@ import { useCallback, useEffect, useState } from "react"
 import type { ColorValue } from "react-native"
 import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native"
 import ProfileHeader from "../components/ProfileHeader"
+import ErrorBoundary from "../components/ErrorBoundary"
 import socket from "./utils/socket"
 
 
@@ -242,32 +244,68 @@ const FullWidthButton = ({ title, subtitle, icon, colors, onPress, shadowColor }
 )
 
 const calculatePregnancy = (lmp: string | number | Date): PregnancyData => {
-  const lmpDate = new Date(lmp)
-  const today = new Date()
-  const daysSinceLMP = Math.floor((today.getTime() - lmpDate.getTime()) / (1000 * 60 * 60 * 24))
-  const totalWeeks = Math.floor(daysSinceLMP / 7)
-  const extraDays = daysSinceLMP % 7
+  try {
+    // Validate input
+    if (!lmp) {
+      throw new Error("LMP date is required")
+    }
 
-  const trimester = totalWeeks <= 12 ? 1 : totalWeeks <= 27 ? 2 : 3
-  const trimesterText = `${trimester}${trimester === 1 ? "st" : trimester === 2 ? "nd" : "rd"} Trimester`
+    const lmpDate = new Date(lmp)
+    
+    // Check if date is valid
+    if (isNaN(lmpDate.getTime())) {
+      throw new Error("Invalid LMP date")
+    }
 
-  const dueDate = new Date(lmpDate)
-  dueDate.setDate(dueDate.getDate() + 280)
-  const remainingDays = Math.max(0, Math.floor((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)))
-  const remainingWeeks = Math.floor(remainingDays / 7)
-  const progressPercentage = Math.min(100, Math.round((totalWeeks / 40) * 100))
+    const today = new Date()
+    const daysSinceLMP = Math.floor((today.getTime() - lmpDate.getTime()) / (1000 * 60 * 60 * 24))
+    
+    // Check for unrealistic dates
+    if (daysSinceLMP < 0) {
+      throw new Error("LMP cannot be in the future")
+    }
+    
+    if (daysSinceLMP > 350) { // More than 50 weeks
+      throw new Error("LMP date seems too far in the past")
+    }
 
-  const babySize = babySizes[String(Math.floor(totalWeeks / 4) * 4)] || babySizes["40"] || "precious baby 👶🏾"
+    const totalWeeks = Math.floor(daysSinceLMP / 7)
+    const extraDays = daysSinceLMP % 7
 
-  return {
-    totalWeeks,
-    extraDays,
-    trimester,
-    trimesterText,
-    remainingWeeks,
-    progressPercentage,
-    babySize,
-    isOverdue: totalWeeks > 40,
+    const trimester = totalWeeks <= 12 ? 1 : totalWeeks <= 27 ? 2 : 3
+    const trimesterText = `${trimester}${trimester === 1 ? "st" : trimester === 2 ? "nd" : "rd"} Trimester`
+
+    const dueDate = new Date(lmpDate)
+    dueDate.setDate(dueDate.getDate() + 280)
+    const remainingDays = Math.max(0, Math.floor((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)))
+    const remainingWeeks = Math.floor(remainingDays / 7)
+    const progressPercentage = Math.min(100, Math.round((totalWeeks / 40) * 100))
+
+    const babySize = babySizes[String(Math.floor(totalWeeks / 4) * 4)] || babySizes["40"] || "precious baby 👶🏾"
+
+    return {
+      totalWeeks,
+      extraDays,
+      trimester,
+      trimesterText,
+      remainingWeeks,
+      progressPercentage,
+      babySize,
+      isOverdue: totalWeeks > 40,
+    }
+  } catch (error) {
+    console.error("Error calculating pregnancy data:", error)
+    // Return safe default values
+    return {
+      totalWeeks: 0,
+      extraDays: 0,
+      trimester: 1,
+      trimesterText: "1st Trimester",
+      remainingWeeks: 40,
+      progressPercentage: 0,
+      babySize: "precious baby 👶🏾",
+      isOverdue: false,
+    }
   }
 }
 
@@ -281,9 +319,13 @@ const HomeScreen = () => {
   const fetchUserData = useCallback(async () => {
     try {
       setLoading(true)
-      const token = await AsyncStorage.getItem("token")
-      const userId = await AsyncStorage.getItem("userId")
-      if (!token || !userId) throw new Error("User not authenticated")
+      const { token, userId } = await getAuthData()
+      
+      if (!token || !userId) {
+        console.error("Authentication data missing - redirecting to login")
+        router.replace("/login")
+        return
+      }
 
       const response = await fetch(`https://pregwell-backend.onrender.com/api/patients/profile/${userId}`, {
         method: "GET",
@@ -293,31 +335,55 @@ const HomeScreen = () => {
         },
       })
 
-      if (!response.ok) throw new Error("Failed to fetch user profile")
+      if (!response.ok) {
+        if (response.status === 401) {
+          console.error("Authentication failed - redirecting to login")
+          await clearAuthData()
+          router.replace("/login")
+          return
+        }
+        throw new Error(`Failed to fetch user profile: ${response.status}`)
+      }
 
       const data = await response.json()
+      
+      // Add safety checks for API response data
       const userProfile = {
-        firstName: data.first_name,
-        lastName: data.last_name,
+        firstName: data.first_name || "User",
+        lastName: data.last_name || "",
         lastMenstrualPeriod: data.last_menstrual_period,
         profilePicture: null,
       }
+      
       setUserData(userProfile)
+      
+      // Only calculate pregnancy data if LMP exists and is valid
       if (userProfile.lastMenstrualPeriod) {
-        setPregnancyData(calculatePregnancy(userProfile.lastMenstrualPeriod))
+        try {
+          setPregnancyData(calculatePregnancy(userProfile.lastMenstrualPeriod))
+        } catch (pregnancyError) {
+          console.error("Error calculating pregnancy data:", pregnancyError)
+          // Continue without pregnancy data rather than crashing
+        }
       }
     } catch (error) {
-      console.error("Error:", error)
+      console.error("Error fetching user data:", error)
+      // Don't crash the app, just show default state
+      setUserData({
+        firstName: "User",
+        lastName: "",
+        lastMenstrualPeriod: null,
+        profilePicture: null,
+      })
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [router])
 
   // 📱 Fetch unread message count
   const fetchUnreadCount = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem("token")
-      const userId = await AsyncStorage.getItem("userId")
+      const { token, userId } = await getAuthData()
       if (!token || !userId) return
 
       const response = await fetch(`https://pregwell-backend.onrender.com/api/messages/inbox/${userId}`, {
@@ -338,28 +404,50 @@ const HomeScreen = () => {
   useEffect(() => {
     fetchUnreadCount()
     
-    // Listen for new messages
-    socket.on("receive_message", (msg: any) => {
-      AsyncStorage.getItem("userId").then(userId => {
-        if (msg.receiver_id === userId) {
-          setUnreadMessageCount(prev => prev + 1)
-        }
-      })
-    })
+    // Add error handling for socket connection
+    const handleSocketError = (error: any) => {
+      console.error("Socket connection error:", error)
+    }
 
-    // Listen for messages being read
-    socket.on("messages_read", ({ senderId, receiverId }: { senderId: string; receiverId: string }) => {
-      AsyncStorage.getItem("userId").then(userId => {
-        if (receiverId === userId) {
-          // Refresh unread count when messages are read
-          fetchUnreadCount()
-        }
-      })
-    })
+    const handleReceiveMessage = (msg: any) => {
+      try {
+        AsyncStorage.getItem("userId").then(userId => {
+          if (msg?.receiver_id === userId) {
+            setUnreadMessageCount(prev => prev + 1)
+          }
+        }).catch(err => {
+          console.error("Error handling received message:", err)
+        })
+      } catch (error) {
+        console.error("Error in receive_message handler:", error)
+      }
+    }
+
+    const handleMessagesRead = ({ senderId, receiverId }: { senderId: string; receiverId: string }) => {
+      try {
+        AsyncStorage.getItem("userId").then(userId => {
+          if (receiverId === userId) {
+            fetchUnreadCount()
+          }
+        }).catch(err => {
+          console.error("Error handling messages read:", err)
+        })
+      } catch (error) {
+        console.error("Error in messages_read handler:", error)
+      }
+    }
+
+    // Set up socket listeners with error handling
+    socket.on("connect_error", handleSocketError)
+    socket.on("error", handleSocketError)
+    socket.on("receive_message", handleReceiveMessage)
+    socket.on("messages_read", handleMessagesRead)
 
     return () => {
-      socket.off("receive_message")
-      socket.off("messages_read")
+      socket.off("connect_error", handleSocketError)
+      socket.off("error", handleSocketError)
+      socket.off("receive_message", handleReceiveMessage)
+      socket.off("messages_read", handleMessagesRead)
     }
   }, [fetchUnreadCount])
 
@@ -614,4 +702,11 @@ const Section = ({
   </>
 )
 
-export default HomeScreen
+// Wrap HomeScreen with ErrorBoundary
+const HomeScreenWithErrorBoundary = () => (
+  <ErrorBoundary>
+    <HomeScreen />
+  </ErrorBoundary>
+)
+
+export default HomeScreenWithErrorBoundary
