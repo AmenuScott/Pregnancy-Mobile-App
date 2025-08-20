@@ -712,7 +712,7 @@ const HomeScreenWithErrorBoundary = () => (
   </ErrorBoundary>
 )
 
-// Temporary simple version for testing
-import HomeTest from './HomeTest';
+// Temporary clean version for testing
+import HomeSimple from './HomeSimple';
 
-export default HomeTest // Temporarily use simple version
+export default HomeSimple // Use clean version without text errors
