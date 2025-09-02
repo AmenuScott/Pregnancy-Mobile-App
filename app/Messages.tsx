@@ -1,10 +1,11 @@
 "use client"
 
 import { Ionicons } from "@expo/vector-icons"
+import { LinearGradient } from "expo-linear-gradient"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useFocusEffect } from "@react-navigation/native"
 import { useRouter } from "expo-router"
-import { useCallback, useState, useEffect } from "react"
+import { useCallback, useState, useEffect, memo } from "react"
 import {
   ActivityIndicator,
   FlatList,
@@ -31,9 +32,11 @@ type Chat = {
 const MessagesScreen = () => {
   const router = useRouter()
   const [messages, setMessages] = useState<Chat[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false) // network in-flight (refresh/search)
+  const [initialLoading, setInitialLoading] = useState(true) // first load gate
   const [refreshing, setRefreshing] = useState(false)
   const [search, setSearch] = useState("")
+  const [viewMode, setViewMode] = useState<'all' | 'unread'>('all')
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -55,9 +58,10 @@ const MessagesScreen = () => {
       )
     } catch (error) {
       console.error("❌ Error fetching inbox:", error)
-      setMessages([])
+      if (initialLoading) setMessages([])
     } finally {
       setLoading(false)
+      if (initialLoading) setInitialLoading(false)
     }
   }, [])
 
@@ -152,9 +156,9 @@ const MessagesScreen = () => {
     setRefreshing(false)
   }, [fetchMessages])
 
-  const filteredMessages = messages.filter((msg) =>
-    msg.name?.toLowerCase().includes(search.toLowerCase())
-  )
+  const filteredMessages = messages
+    .filter(msg => msg.name?.toLowerCase().includes(search.toLowerCase()))
+    .filter(msg => viewMode === 'all' ? true : (msg.unreadCount ?? 0) > 0)
 
   const formatTime = (dateString: string): string => {
     try {
@@ -184,142 +188,157 @@ const MessagesScreen = () => {
     }
   }
 
-  const renderItem = ({ item }: { item: Chat }) => (
-    <TouchableOpacity
-      style={styles.chatCard}
-      onPress={() =>
-        router.push({
-          pathname: "/ChatScreen/[id]",
-          params: {
-            id: item.id,
-            receiverName: item.name || "Unknown",
-          },
-        })
-      }
-      activeOpacity={0.7}
-    >
-      <View style={styles.avatarContainer}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {item.name
-              ? item.name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")
-                  .toUpperCase()
-              : ""}
-          </Text>
-        </View>
-        {item.unreadCount && item.unreadCount > 0 && <View style={styles.onlineIndicator} />}
-      </View>
+  const MessageItem = memo(({ item }: { item: Chat }) => {
+    const initials = (item.name || '')
+      .split(' ')
+      .filter(Boolean)
+      .map(n => n[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase()
 
-      <View style={styles.chatContent}>
-        <View style={styles.chatHeader}>
-          <Text style={styles.chatName} numberOfLines={1}>
-            {item.name || "Unknown"}
-          </Text>
-          <Text style={styles.chatTime}>{formatTime(item.created_at)}</Text>
-        </View>
-
-        <View style={styles.chatFooter}>
-          <Text numberOfLines={2} style={styles.lastMessage}>
-            {typeof item.content === "string" ? item.content : String(item.content)}
-          </Text>
-          {item.unreadCount && item.unreadCount > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadText}>
-                {item.unreadCount && item.unreadCount > 99 ? "99+" : String(item.unreadCount || 0)}
-              </Text>
-            </View>
-          )}
-        </View>
-      </View>
-    </TouchableOpacity>
-  )
-
-  if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-        <View style={styles.loadingContainer}>
-          <View style={styles.loadingContent}>
-            <ActivityIndicator size="large" color="#6c5ce7" />
-            <Text style={styles.loadingText}>Loading conversations...</Text>
-          </View>
+      <TouchableOpacity
+        style={styles.chatCard}
+        onPress={() =>
+          router.push({
+            pathname: "/ChatScreen/[id]",
+            params: {
+              id: item.id,
+              receiverName: item.name || "Unknown",
+            },
+          })
+        }
+        activeOpacity={0.75}
+      >
+        <View style={styles.avatarContainer}>
+          <LinearGradient colors={['#6c5ce7', '#8e44ad']} style={styles.avatar}>
+            <Text style={styles.avatarText}>{initials}</Text>
+          </LinearGradient>
+          {(item.unreadCount ?? 0) > 0 && <View style={styles.onlineIndicator} />}
         </View>
-      </SafeAreaView>
-    )
-  }
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.headerButton} onPress={() => router.back()} activeOpacity={0.7}>
-            <Ionicons name="arrow-back" size={24} color="#2d3436" />
-          </TouchableOpacity>
-
-          <View style={styles.headerCenter}>
-            <Text style={styles.headerTitle}>Messages</Text>
-            <Text style={styles.headerSubtitle}>
-              {`${messages.length || 0} conversation${messages.length !== 1 ? "s" : ""}`}
+        <View style={styles.chatContent}>
+          <View style={styles.chatHeader}>
+            <Text style={styles.chatName} numberOfLines={1}>
+              {item.name || 'Unknown'}
             </Text>
+            <Text style={styles.chatTime}>{formatTime(item.created_at)}</Text>
           </View>
-
-          <TouchableOpacity style={styles.headerButton} onPress={() => router.push("/NewChats")} activeOpacity={0.7}>
-            <Ionicons name="create-outline" size={24} color="#6c5ce7" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <View style={styles.searchBar}>
-            <Ionicons name="search" size={20} color="#74b9ff" />
-            <TextInput
-              placeholder="Search conversations..."
-              placeholderTextColor="#999"
-              style={styles.searchInput}
-              value={search}
-              onChangeText={setSearch}
-            />
-            {search.length > 0 && (
-              <TouchableOpacity onPress={() => setSearch("")} activeOpacity={0.7}>
-                <Ionicons name="close-circle" size={20} color="#ddd" />
-              </TouchableOpacity>
+          <View style={styles.chatFooter}>
+            <Text numberOfLines={2} style={styles.lastMessage}>
+              {typeof item.content === 'string' ? item.content : String(item.content)}
+            </Text>
+            {(item.unreadCount ?? 0) > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadText}>
+                  {(item.unreadCount ?? 0) > 99 ? '99+' : String(item.unreadCount)}
+                </Text>
+              </View>
             )}
           </View>
         </View>
+      </TouchableOpacity>
+    )
+  })
 
-        {/* Chat List */}
+  const renderItem = ({ item }: { item: Chat }) => <MessageItem item={item} />
+
+  const ListHeader = () => (
+    <View>
+      {/* Tabs */}
+      <View style={styles.tabsRow}>
+        {([['all','All'], ['unread','Unread']] as const).map(([key, label]) => {
+          const active = viewMode === key
+          return (
+            <TouchableOpacity
+              key={key}
+              style={[styles.tabChip, active && styles.tabChipActive]}
+              onPress={() => setViewMode(key)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.tabChipText, active && styles.tabChipTextActive]}>{label}</Text>
+              {key === 'unread' && messages.some(m => (m.unreadCount ?? 0) > 0) && (
+                <View style={styles.unreadDot} />
+              )}
+            </TouchableOpacity>
+          )
+        })}
+      </View>
+    </View>
+  )
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor="#6c5ce7" />
+      <View style={styles.topHeaderWrapper}>
+        <LinearGradient colors={["#6c5ce7", "#8e44ad"]} style={styles.gradientHeader}>
+          <View style={styles.headerRow}>
+            <TouchableOpacity style={styles.headerIconBtn} onPress={() => router.back()} activeOpacity={0.7}>
+              <Ionicons name="arrow-back" size={22} color="#fff" />
+            </TouchableOpacity>
+            <View style={styles.headerTitles}>
+              <Text style={styles.headerTitleAlt}>Messages</Text>
+              <Text style={styles.headerSubtitleAlt}>{`${messages.length} conversation${messages.length !== 1 ? 's' : ''}`}</Text>
+            </View>
+            <TouchableOpacity style={styles.headerIconBtn} onPress={() => router.push('/NewChats')} activeOpacity={0.7}>
+              <Ionicons name="create-outline" size={22} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.searchBarAlt}>
+            <Ionicons name="search" size={18} color="#fff" />
+            <TextInput
+              placeholder="Search conversations"
+              placeholderTextColor="rgba(255,255,255,0.6)"
+              style={styles.searchInputAlt}
+              value={search}
+              onChangeText={setSearch}
+            />
+            {initialLoading && <ActivityIndicator size="small" color="#fff" />}
+            {search.length > 0 && !loading && (
+              <TouchableOpacity onPress={() => setSearch("")} activeOpacity={0.6}>
+                <Ionicons name="close" size={18} color="#fff" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </LinearGradient>
+      </View>
+      <View style={styles.containerRounded}>
         <FlatList
           data={filteredMessages}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={filteredMessages.length === 0 ? styles.emptyContainer : styles.listContainer}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#6c5ce7"]} tintColor="#6c5ce7" />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <View style={styles.emptyIconContainer}>
-                <Ionicons name="chatbubbles-outline" size={80} color="#ddd" />
-              </View>
-              <Text style={styles.emptyTitle}>No conversations yet</Text>
-              <Text style={styles.emptySubtitle}>Start a new conversation to see your messages here</Text>
-              <TouchableOpacity
-                style={styles.startChatButton}
-                onPress={() => router.push("/NewChats")}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="add" size={20} color="#fff" />
-                <Text style={styles.startChatText}>Start New Chat</Text>
-              </TouchableOpacity>
-            </View>
-          }
-        />
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            ListHeaderComponent={<ListHeader />}
+            contentContainerStyle={filteredMessages.length === 0 ? styles.emptyContainer : styles.listContainer}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#6c5ce7"]} tintColor="#6c5ce7" />
+            }
+            ListEmptyComponent={
+              !loading ? (
+                <View style={styles.emptyState}>
+                  <View style={styles.emptyIconContainer}>
+                    <Ionicons name="chatbubbles-outline" size={80} color="#ccc" />
+                  </View>
+                  <Text style={styles.emptyTitle}>No conversations</Text>
+                  <Text style={styles.emptySubtitle}>Tap below to start your first chat.</Text>
+                  <TouchableOpacity
+                    style={styles.startChatButton}
+                    onPress={() => router.push('/NewChats')}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="add" size={20} color="#fff" />
+                    <Text style={styles.startChatText}>Start Chat</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null
+            }
+          />
+  {initialLoading && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="large" color="#6c5ce7" />
+          </View>
+        )}
       </View>
     </SafeAreaView>
   )
@@ -328,93 +347,23 @@ const MessagesScreen = () => {
 export default MessagesScreen
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  container: {
-    flex: 1,
-    backgroundColor: "#f8f9fa",
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: "#f8f9fa",
-  },
-  loadingContent: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: "#74b9ff",
-    fontWeight: "500",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    paddingTop: Platform.OS === "android" ? 20 : 16,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e9ecef",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  headerButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f8f9fa",
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: "center",
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#2d3436",
-    marginBottom: 2,
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    color: "#74b9ff",
-    fontWeight: "500",
-  },
-  searchContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: "#fff",
-  },
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f8f9fa",
-    borderRadius: 25,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: "#e9ecef",
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: "#2d3436",
-    marginLeft: 12,
-    marginRight: 8,
-  },
+  safeArea: { flex: 1, backgroundColor: '#6c5ce7' },
+  topHeaderWrapper: { backgroundColor: '#6c5ce7' },
+  gradientHeader: { paddingTop: Platform.OS === 'android' ? 40 : 20, paddingHorizontal: 16, paddingBottom: 24 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
+  headerIconBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
+  headerTitles: { flex: 1, alignItems: 'center' },
+  headerTitleAlt: { fontSize: 22, fontWeight: '700', color: '#fff' },
+  headerSubtitleAlt: { fontSize: 13, fontWeight: '500', color: 'rgba(255,255,255,0.8)', marginTop: 2 },
+  searchBarAlt: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10, gap: 10 },
+  searchInputAlt: { flex: 1, fontSize: 15, color: '#fff' },
+  containerRounded: { flex: 1, backgroundColor: '#f8f9fa', borderTopLeftRadius: 28, borderTopRightRadius: 28, marginTop: -20, paddingTop: 12 },
+  tabsRow: { flexDirection: 'row', paddingHorizontal: 16, marginBottom: 12, gap: 10 },
+  tabChip: { paddingHorizontal: 18, height: 40, borderRadius: 20, backgroundColor: '#eceef3', flexDirection: 'row', alignItems: 'center' },
+  tabChipActive: { backgroundColor: '#6c5ce7' },
+  tabChipText: { fontSize: 14, fontWeight: '600', color: '#4a4f58' },
+  tabChipTextActive: { color: '#fff' },
+  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#e17055', marginLeft: 6 },
   listContainer: {
     paddingHorizontal: 16,
     paddingTop: 8,
@@ -445,22 +394,7 @@ const styles = StyleSheet.create({
     position: "relative",
     marginRight: 16,
   },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#6c5ce7",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#6c5ce7",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
+  avatar: { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', shadowColor: '#6c5ce7', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 5, elevation: 4 },
   avatarText: {
     color: "#fff",
     fontSize: 18,
@@ -570,4 +504,5 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginLeft: 8,
   },
+  loadingOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.6)' },
 })
