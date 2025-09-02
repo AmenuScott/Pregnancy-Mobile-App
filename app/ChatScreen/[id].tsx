@@ -1,8 +1,9 @@
 "use client"
 
+import { Ionicons } from "@expo/vector-icons"
 import AsyncStorage from "@react-native-async-storage/async-storage"
-import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router"
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   Alert,
   FlatList,
@@ -16,7 +17,6 @@ import {
   TouchableOpacity,
   View
 } from "react-native"
-import { Ionicons } from "@expo/vector-icons"
 import { setupNotification, showLocalNotification } from "../utils/notify"
 import socket from "../utils/socket"
 

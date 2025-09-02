@@ -9,6 +9,8 @@ import { useCallback, useEffect, useState } from "react"
 import type { ColorValue } from "react-native"
 import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native"
 import ProfileHeader from "../components/ProfileHeader"
+import socket from "./utils/socket"
+
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FAFAFA" },
@@ -110,6 +112,23 @@ const s = StyleSheet.create({
   },
   cardTitle: { fontSize: 16, fontWeight: "bold", textAlign: "center", color: "#2C3E50", marginBottom: 4 },
   cardSubtitle: { fontSize: 12, color: "#7F8C8D", textAlign: "center", fontWeight: "500" },
+  unreadBadge: {
+    position: "absolute",
+    top: -5,
+    right: -5,
+    backgroundColor: "#FF4444",
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1,
+  },
+  unreadText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "bold",
+  },
   fullWidth: {
     marginHorizontal: 20,
     marginBottom: 20,
@@ -179,16 +198,24 @@ type CardProps = {
   icon: string
   colors: [ColorValue, ColorValue, ...ColorValue[]]
   onPress: () => void
+  unreadCount?: number
 }
 
-const Card = ({ title, subtitle, icon, colors, onPress }: CardProps) => (
+const Card = ({ title, subtitle, icon, colors, onPress, unreadCount }: CardProps) => (
   <TouchableOpacity style={s.card} onPress={onPress}>
     <LinearGradient colors={colors} style={s.cardContent}>
       <View style={s.iconContainer}>
-        <Ionicons name={icon as any} size={28} color={typeof colors[0] === "string" ? colors[0].replace(/[^#]/g, "").slice(0, 7) : "#000"} />
+        <Ionicons name={icon as any} size={28} color="#6c5ce7" />
       </View>
       <Text style={s.cardTitle}>{title}</Text>
       <Text style={s.cardSubtitle}>{subtitle}</Text>
+      {unreadCount && unreadCount > 0 && (
+        <View style={s.unreadBadge}>
+          <Text style={s.unreadText}>
+            {unreadCount > 99 ? "99+" : String(unreadCount)}
+          </Text>
+        </View>
+      )}
     </LinearGradient>
   </TouchableOpacity>
 )
@@ -200,36 +227,19 @@ type FullWidthButtonProps = {
   colors: [ColorValue, ColorValue, ...ColorValue[]]
   onPress: () => void
   shadowColor?: ColorValue
-  disabled?: boolean
 }
 
-const FullWidthButton = ({ title, subtitle, icon, colors, onPress, shadowColor, disabled }: FullWidthButtonProps) => {
-  if (disabled) {
-    return (
-      <View style={[s.fullWidth, { shadowColor, position: 'relative' }]}> 
-        <LinearGradient colors={colors} style={s.fullWidthContent}>
-          <View style={s.emergencyContent}>
-            <Ionicons name={icon as any} size={24} color="white" />
-            <Text style={s.emergencyText}>{title}</Text>
-            {subtitle && <Ionicons name="chevron-forward" size={20} color="white" />}
-          </View>
-        </LinearGradient>
-        <BlurView intensity={10} tint="light" style={[StyleSheet.absoluteFill, { borderRadius: 15 }]} pointerEvents="none" />
+const FullWidthButton = ({ title, subtitle, icon, colors, onPress, shadowColor }: FullWidthButtonProps) => (
+  <TouchableOpacity style={[s.fullWidth, { shadowColor }]} onPress={onPress}>
+    <LinearGradient colors={colors} style={s.fullWidthContent}>
+      <View style={s.emergencyContent}>
+        <Ionicons name={'warning'} size={24} color="white" />
+        <Text style={s.emergencyText}>{title}</Text>
+        {subtitle && <Ionicons name="call" size={20} color="white" />}
       </View>
-    )
-  }
-  return (
-    <TouchableOpacity style={[s.fullWidth, { shadowColor }]} onPress={onPress} activeOpacity={0.85}>
-      <LinearGradient colors={colors} style={s.fullWidthContent}>
-        <View style={s.emergencyContent}>
-          <Ionicons name={icon as any} size={24} color="white" />
-          <Text style={s.emergencyText}>{title}</Text>
-          {subtitle && <Ionicons name="chevron-forward" size={20} color="white" />}
-        </View>
-      </LinearGradient>
-    </TouchableOpacity>
-  )
-}
+    </LinearGradient>
+  </TouchableOpacity>
+)
 
 const calculatePregnancy = (lmp: string | number | Date): PregnancyData => {
   const lmpDate = new Date(lmp)
@@ -266,6 +276,7 @@ const HomeScreen = () => {
   const [userData, setUserData] = useState<UserData>(null)
   const [pregnancyData, setPregnancyData] = useState<PregnancyData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0)
 
   const fetchUserData = useCallback(async () => {
     try {
@@ -301,6 +312,56 @@ const HomeScreen = () => {
       setLoading(false)
     }
   }, [])
+
+  // 📱 Fetch unread message count
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const token = await AsyncStorage.getItem("token")
+      const userId = await AsyncStorage.getItem("userId")
+      if (!token || !userId) return
+
+      const response = await fetch(`https://pregwell-backend.onrender.com/api/messages/inbox/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const totalUnread = data.reduce((sum: number, chat: any) => sum + (chat.unreadCount || 0), 0)
+        setUnreadMessageCount(totalUnread)
+      }
+    } catch (error) {
+      console.error("Error fetching unread count:", error)
+    }
+  }, [])
+
+  // 📡 Real-time unread count updates
+  useEffect(() => {
+    fetchUnreadCount()
+    
+    // Listen for new messages
+    socket.on("receive_message", (msg: any) => {
+      AsyncStorage.getItem("userId").then(userId => {
+        if (msg.receiver_id === userId) {
+          setUnreadMessageCount(prev => prev + 1)
+        }
+      })
+    })
+
+    // Listen for messages being read
+    socket.on("messages_read", ({ senderId, receiverId }: { senderId: string; receiverId: string }) => {
+      AsyncStorage.getItem("userId").then(userId => {
+        if (receiverId === userId) {
+          // Refresh unread count when messages are read
+          fetchUnreadCount()
+        }
+      })
+    })
+
+    return () => {
+      socket.off("receive_message")
+      socket.off("messages_read")
+    }
+  }, [fetchUnreadCount])
 
   useEffect(() => {
     fetchUserData()
@@ -392,7 +453,7 @@ const HomeScreen = () => {
 
         <Section
           title="Health & Wellness"
-          icon="medical"
+          icon="medkit-outline"
           cards={[
             {
               title: "Symptom Check",
@@ -413,7 +474,7 @@ const HomeScreen = () => {
 
         <Section
           title="Lifestyle"
-          icon="leaf"
+          icon="leaf-outline"
           cards={[
             {
               title: "Nutrition",
@@ -434,7 +495,7 @@ const HomeScreen = () => {
 
         <Section
           title="Community"
-          icon="people"
+          icon="people-outline"
           cards={[
             {
               title: "AI Assistant",
@@ -449,20 +510,60 @@ const HomeScreen = () => {
               icon: "chatbubbles-outline",
               colors: ["#FFF3E0", "#FFFAF0"],
               onPress: () => router.push("/Messages"),
+              unreadCount: unreadMessageCount,
             },
           ]}
         />
 
-        {/* Post Natal Care Section - always visible; disabled until 3rd trimester */}
-        <FullWidthButton
-          title="Post Natal Care"
+        {/* Post Natal Care Section */}
+        {pregnancyData && pregnancyData.trimester === 3 && !pregnancyData.isOverdue ? (
+          <FullWidthButton
+            title="Post Natal Care"
             subtitle="Recovery & baby care support"
             icon="heart"
             colors={["#E91E63", "#D81B60"]}
             shadowColor="#E91E63"
             onPress={() => router.push("/PostNatal")}
-            disabled={!(pregnancyData && pregnancyData.trimester === 3 && !pregnancyData.isOverdue)}
-        />
+          />
+        ) : (
+          <View style={[s.fullWidth, { marginBottom: 20, overflow: "hidden", shadowColor: "#E91E63" }]}>
+            <View pointerEvents="none">
+              <FullWidthButton
+                title="Post Natal Care"
+                subtitle="Recovery & baby care support"
+                icon="heart"
+                colors={["#E91E63", "#D81B60"]}
+                shadowColor="#E91E63"
+                onPress={() => {}}
+              />
+            </View>
+            <BlurView
+              intensity={60}
+              tint="dark"
+              style={StyleSheet.absoluteFill}
+            >
+              <View style={{
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+                borderRadius: 15,
+                backgroundColor: "rgba(0,0,0,0.35)",
+              }}>
+                <Text style={{
+                  color: "#fff",
+                  fontWeight: "bold",
+                  fontSize: 16,
+                  textAlign: "center",
+                  textShadowColor: "#000",
+                  textShadowRadius: 8,
+                }}>
+                  Post Natal Section
+                  Available in 3rd Trimester
+                </Text>
+              </View>
+            </BlurView>
+          </View>
+        )}
 
         <FullWidthButton
           title="Emergency Help"
@@ -498,7 +599,7 @@ const Section = ({
 }: {
   title: string
   icon: string
-  cards: CardProps[]
+  cards: (CardProps & { unreadCount?: number })[]
 }) => (
   <>
     <View style={s.sectionHeader}>
@@ -514,5 +615,3 @@ const Section = ({
 )
 
 export default HomeScreen
-
-

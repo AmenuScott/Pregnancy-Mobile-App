@@ -5,22 +5,22 @@ import { LinearGradient } from "expo-linear-gradient"
 import { useRouter } from "expo-router"
 import { useEffect, useState } from "react"
 import {
-    ActionSheetIOS,
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Image,
-    Linking,
-    Modal,
-    Platform,
-    RefreshControl,
-    SafeAreaView,
-    Share,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActionSheetIOS,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  Linking,
+  Modal,
+  Platform,
+  RefreshControl,
+  SafeAreaView,
+  Share,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native"
 
 const statusBarHeight = Platform.OS === "ios" ? 44 : StatusBar.currentHeight || 24
