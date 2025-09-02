@@ -73,7 +73,7 @@ const PostnatalMenu = () => {
       title: "Recovery Tips",
       subtitle: "Monitor your healing journey",
       icon: "fitness-outline",
-      colors: ["#FF6B9D", "#C44569"],
+      colors: ["#FF6B9D", "#C44569"] as const,
       navigateTo: "/recovery", // Navigate to separate Recovery page
       progress: "75%",
     },
@@ -81,7 +81,7 @@ const PostnatalMenu = () => {
       title: "Menstrual Cycle",
       subtitle: "Track your cycle's return",
       icon: "calendar-outline",
-      colors: ["#FF9A56", "#FF6B35"],
+      colors: ["#FF9A56", "#FF6B35"] as const,
       navigateTo: "/menstrual", // Navigate to separate Menstrual page
       progress: "Next: Mar 15",
     },
@@ -89,7 +89,7 @@ const PostnatalMenu = () => {
       title: "Baby Care Guide",
       subtitle: "Essential care tips by age",
       icon: "heart-outline",
-      colors: ["#4ECDC4", "#44A08D"],
+      colors: ["#4ECDC4", "#44A08D"] as const,
       navigateTo: "/babycare", // Navigate to separate BabyCare page
       progress: "0-6 months",
     },

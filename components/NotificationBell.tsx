@@ -1,42 +1,38 @@
 import { Ionicons } from "@expo/vector-icons"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useRouter } from "expo-router"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
+import * as Notifications from 'expo-notifications'
 import { Text, TouchableOpacity, View } from "react-native"
 
 export default function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0)
   const router = useRouter()
 
-  const fetchUnread = async () => {
-    const userId = await AsyncStorage.getItem("user_id")
-    if (!userId) return
-
-    try {
-      const res = await fetch(`https://pregwell-backend.onrender.com/api/notifications/${userId}`)
-      const data = await res.json()
-
-      // ✅ Safely check if response is an array
-      if (Array.isArray(data)) {
-        const unread = data.filter((n: any) => !n.is_read)
-        setUnreadCount(unread.length)
-      } else {
-        console.warn("Unexpected notifications response:", data)
-        setUnreadCount(0)
-      }
-    } catch (error) {
-      console.error("Failed to fetch unread count:", error)
-      setUnreadCount(0)
-    }
-  }
-
-  useEffect(() => {
-    fetchUnread()
+  const resolveUserId = useCallback(async () => {
+    return (await AsyncStorage.getItem('userId')) || (await AsyncStorage.getItem('user_id')) || null
   }, [])
+
+  const fetchUnread = useCallback(async () => {
+    const uid = await resolveUserId();
+    if (!uid) return;
+    try {
+      const res = await fetch(`https://pregwell-backend.onrender.com/api/notifications/${uid}`);
+      const data = await res.json();
+      setUnreadCount(Array.isArray(data) ? data.filter((n: any) => !n.is_read).length : 0);
+    } catch { setUnreadCount(0); }
+  }, [resolveUserId])
+
+  const subRef = useRef<any>(null)
+  useEffect(() => {
+    fetchUnread();
+    subRef.current = Notifications.addNotificationReceivedListener(() => fetchUnread());
+    return () => { if (subRef.current) Notifications.removeNotificationSubscription(subRef.current); };
+  }, [fetchUnread])
 
   return (
     <TouchableOpacity
-      onPress={() => router.push("/notifications")}
+  onPress={() => router.push("/Notification")}
       style={{ position: "relative", padding: 8 }}
     >
       <Ionicons name="notifications-outline" size={28} color="#9c27b0" />

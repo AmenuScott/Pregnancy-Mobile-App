@@ -73,10 +73,30 @@ export default function EmergencyScreen() {
 
   useEffect(() => {
     const loadUserId = async () => {
-      const storedUser = await AsyncStorage.getItem("user")
-      const parsed = storedUser ? JSON.parse(storedUser) : null
-      if (parsed?.id) {
-        setUserId(parsed.id)
+      try {
+        // Preferred explicit key used elsewhere in app
+        const directId = await AsyncStorage.getItem('userId')
+        if (directId) {
+          setUserId(directId)
+          return
+        }
+        // Fallback: older stored composite object
+        const storedUser = await AsyncStorage.getItem('user')
+        if (storedUser) {
+          try {
+            const parsed = JSON.parse(storedUser)
+            const possibleId = parsed?.id || parsed?._id || parsed?.userId
+            if (possibleId) {
+              setUserId(String(possibleId))
+              return
+            }
+          } catch (e) {
+            console.log('Failed to parse stored user JSON', e)
+          }
+        }
+        console.log('No user id found in AsyncStorage (userId / user)')
+      } catch (e) {
+        console.log('Error loading user id', e)
       }
     }
     loadUserId()
@@ -120,8 +140,24 @@ export default function EmergencyScreen() {
 
   // Add a new emergency contact
   const handleAddContact = async () => {
+    // If userId somehow not yet loaded, attempt one more retrieval before failing
     if (!userId) {
-      Alert.alert("Error", "User not logged in. Cannot add contact.")
+      const retryId = await AsyncStorage.getItem('userId')
+      if (retryId) {
+        setUserId(retryId)
+      } else {
+        const storedUser = await AsyncStorage.getItem('user')
+        if (storedUser) {
+          try {
+            const parsed = JSON.parse(storedUser)
+            const possibleId = parsed?.id || parsed?._id || parsed?.userId
+            if (possibleId) setUserId(String(possibleId))
+          } catch {}
+        }
+      }
+    }
+    if (!userId) {
+      Alert.alert('Error', 'User not logged in. Cannot add contact.')
       return
     }
     if (!name.trim() || !number.trim()) {
@@ -151,7 +187,11 @@ export default function EmergencyScreen() {
   // Delete a contact
   const handleDeleteContact = async (contactId: string, contactName: string) => {
     if (!userId) {
-      Alert.alert("Error", "User not logged in. Cannot delete contact.")
+      const retryId = await AsyncStorage.getItem('userId')
+      if (retryId) setUserId(retryId)
+    }
+    if (!userId) {
+      Alert.alert('Error', 'User not logged in. Cannot delete contact.')
       return
     }
     Alert.alert(`Delete Contact`, `Remove ${contactName}?`, [

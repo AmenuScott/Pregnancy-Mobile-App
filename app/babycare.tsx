@@ -180,6 +180,14 @@ const BabyCareScreen = () => {
     if (userId) fetchPersonalizedTips(userId, babyDOB) // Fetch personalized tips after saving DOB
   }
 
+  // Auto-format YYYY-MM-DD while typing
+  const formatBabyDateInput = (text: string) => {
+    const cleaned = text.replace(/\D/g, "")
+    if (cleaned.length <= 4) return cleaned
+    if (cleaned.length <= 6) return `${cleaned.slice(0, 4)}-${cleaned.slice(4)}`
+    return `${cleaned.slice(0, 4)}-${cleaned.slice(4, 6)}-${cleaned.slice(6, 8)}`
+  }
+
   const fetchPersonalizedTips = async (uid: string, dob: string) => {
     if (!uid || !dob) return
     setLoadingPersonalized(true)
@@ -470,7 +478,7 @@ const BabyCareScreen = () => {
       <View style={styles.statsContainer}>
         <LinearGradient colors={["rgba(255,255,255,0.95)", "rgba(255,255,255,0.85)"]} style={styles.statsCard}>
           <View style={styles.singleStatItem}>
-            <Ionicons name="baby-outline" size={24} color="#4ECDC4" />
+            <Ionicons name={"baby-outline" as any} size={24} color="#4ECDC4" />
             <Text style={styles.singleStatText}>
               Your Baby is: {babyAgeWeeks !== null ? `${babyAgeWeeks} week(s) old` : "--"}
             </Text>
@@ -491,7 +499,7 @@ const BabyCareScreen = () => {
               onPress={() => setSelectedTab(tab.id)}
             >
               <Ionicons
-                name={tab.icon}
+                name={tab.icon as any}
                 size={16}
                 color={selectedTab === tab.id ? "white" : "#7F8C8D"}
                 style={styles.tabIcon}
@@ -559,9 +567,11 @@ const BabyCareScreen = () => {
                     style={styles.input}
                     placeholder="YYYY-MM-DD"
                     value={babyDOB}
-                    onChangeText={setBabyDOB}
-                    keyboardType="numeric"
+                    onChangeText={(t) => setBabyDOB(formatBabyDateInput(t))}
+                    keyboardType="number-pad"
+                    maxLength={10}
                   />
+                  <Text style={styles.helperText}>Format: YYYY-MM-DD</Text>
                   <TouchableOpacity onPress={saveBabyDOB} style={styles.saveButton}>
                     <LinearGradient colors={["#4ECDC4", "#44A08D"]} style={styles.saveButtonGradient}>
                       <Ionicons name="calendar" size={18} color="white" />
@@ -579,7 +589,7 @@ const BabyCareScreen = () => {
                       <Text style={styles.infoItemText}>Born on: {storedDOB}</Text>
                     </View>
                     <View style={styles.infoItem}>
-                      <Ionicons name="baby-outline" size={20} color="#00ACC1" />
+                      <Ionicons name={"baby-outline" as any} size={20} color="#00ACC1" />
                       <Text style={styles.infoItemText}>Your baby is {babyAgeWeeks} week(s) old</Text>
                     </View>
                     <View style={styles.infoItem}>
@@ -790,9 +800,7 @@ const styles = StyleSheet.create({
     flex: 1, // Allow FlatList to take available space
     marginBottom: 20,
   },
-  myBabySectionContent: {
-    paddingBottom: 20, // Add bottom padding for content within the scroll view
-  },
+  // (Removed duplicate myBabySectionContent here; defined at bottom)
   newsFeedListContainer: {
     paddingBottom: 20,
     paddingHorizontal: 20, // Added padding here for news feed items
@@ -1174,5 +1182,12 @@ const styles = StyleSheet.create({
   },
   myBabySectionContent: {
     paddingBottom: 20, // Add bottom padding for content within the scroll view
+  },
+  helperText: {
+    fontSize: 11,
+    color: "#7F8C8D",
+    marginTop: -10,
+    marginBottom: 12,
+    alignSelf: "flex-start",
   },
 })

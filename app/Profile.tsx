@@ -350,17 +350,19 @@ const ProfileScreen = () => {
     )
   }
 
-  const renderLogoutButton = () =>
-    renderAnimatedCard(
-      4,
-      <TouchableOpacity style={styles.logoutButton} onPress={() => router.push("/Logout")} activeOpacity={0.8}>
-        <LinearGradient colors={["#FF5722", "#D32F2F"]} style={styles.logoutGradient}>
-          <Ionicons name="log-out-outline" size={20} color="white" />
-          <Text style={styles.logoutText}>Log Out</Text>
-        </LinearGradient>
-      </TouchableOpacity>,
-      styles.logoutContainer,
-    )
+  const renderLogoutButton = () => (
+    <View style={styles.logoutContainer}>
+      {renderAnimatedCard(
+        4,
+        <TouchableOpacity style={styles.logoutButton} onPress={() => router.push("/Logout")} activeOpacity={0.8}>
+          <LinearGradient colors={["#FF5722", "#D32F2F"]} style={styles.logoutGradient}>
+            <Ionicons name="log-out-outline" size={20} color="white" />
+            <Text style={styles.logoutText}>Log Out</Text>
+          </LinearGradient>
+        </TouchableOpacity>,
+      )}
+    </View>
+  )
 
   return (
     <>
@@ -801,13 +803,17 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
     marginBottom: 20,
+  overflow: "hidden",
+  width: "100%",
   },
   logoutGradient: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 30,
-    borderRadius: 15,
+  paddingHorizontal: 35,
+  paddingVertical: 18,
+  borderRadius: 15,
+  minHeight: 60,
   },
   logoutText: {
     fontSize: 16,

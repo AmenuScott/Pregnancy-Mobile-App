@@ -54,7 +54,8 @@ const menstrualSymptoms = [
 
 const MenstrualScreen = () => {
   const router = useRouter()
-  const [selectedTab, setSelectedTab] = useState("tracker")
+  // Default to cycle view first as requested
+  const [selectedTab, setSelectedTab] = useState("calendar")
 
   // Menstrual tracking state
   const [cycleStartDate, setCycleStartDate] = useState("")
@@ -70,6 +71,8 @@ const MenstrualScreen = () => {
   const [insightsLoading, setInsightsLoading] = useState(false)
   const [nextPeriod, setNextPeriod] = useState<string | null>(null)
   const [averageCycle, setAverageCycle] = useState<number | null>(null)
+  // Internal tick to force recalculation of rolling predictions
+  const [timeTick, setTimeTick] = useState(0)
 
 
   // Fetch userId on component mount
@@ -79,11 +82,14 @@ const MenstrualScreen = () => {
       setUserId(id)
     }
     getUserId()
+  // Set up interval to update tick every 60 minutes so passed predictions roll forward
+  const interval = setInterval(() => setTimeTick((t) => t + 1), 60 * 60 * 1000)
+  return () => clearInterval(interval)
   }, [])
 
-  // Fetch menstrual logs when tab is 'calendar' or userId changes
-const fetchMenstrualLogs = useCallback(async () => {
-  if (selectedTab === "calendar" && userId) {
+  // Fetch menstrual logs whenever userId changes or a refresh is needed
+  const fetchMenstrualLogs = useCallback(async () => {
+    if (!userId) return
     setLogsLoading(true)
     try {
       const response = await fetch(`https://pregwell-backend.onrender.com/api/menstrual-logs/${userId}`)
@@ -91,9 +97,40 @@ const fetchMenstrualLogs = useCallback(async () => {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       const data = await response.json()
-      setMenstrualLogs(data.logs || [])
-      setNextPeriod(data.nextPeriod || null)
-      setAverageCycle(data.averageCycle || null)
+      const logs: MenstrualLog[] = data.logs || []
+      setMenstrualLogs(logs)
+
+      // Use backend provided averages if available
+      let avg = data.averageCycle || null
+      if (!avg && logs.length > 1) {
+        // Compute average difference between consecutive start dates
+        const sorted = [...logs].sort(
+          (a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime(),
+        )
+        const diffs: number[] = []
+        for (let i = 1; i < sorted.length; i++) {
+          const diffMs = new Date(sorted[i].start_date).getTime() - new Date(sorted[i - 1].start_date).getTime()
+            ;
+          diffs.push(Math.round(diffMs / (1000 * 60 * 60 * 24)))
+        }
+        if (diffs.length) {
+          avg = Math.round(diffs.reduce((s, d) => s + d, 0) / diffs.length)
+        }
+      }
+      if (!avg) avg = 28 // fallback typical cycle length
+      setAverageCycle(avg)
+
+      // Determine next period: prefer backend else compute
+      let next = data.nextPeriod || null
+      if (!next && logs.length) {
+        const latest = logs
+          .map((l) => new Date(l.start_date))
+          .sort((a, b) => b.getTime() - a.getTime())[0]
+        const nextDate = new Date(latest)
+        nextDate.setDate(nextDate.getDate() + (avg || 28))
+        next = nextDate.toISOString()
+      }
+      setNextPeriod(next)
     } catch (error) {
       console.error("Error fetching menstrual logs:", error)
       Alert.alert("Error", "Failed to load menstrual logs. Please try again.")
@@ -101,8 +138,29 @@ const fetchMenstrualLogs = useCallback(async () => {
     } finally {
       setLogsLoading(false)
     }
-  }
-}, [selectedTab, userId])
+  }, [userId])
+
+  // Recalculate rolling future next period if predicted date already passed
+  useEffect(() => {
+    if (!menstrualLogs.length || !averageCycle) return
+    try {
+      const latest = menstrualLogs
+        .map((l) => new Date(l.start_date))
+        .sort((a, b) => b.getTime() - a.getTime())[0]
+      if (!latest) return
+      let candidate = new Date(latest)
+      const cycleLen = averageCycle || 28
+      const now = new Date()
+      // Advance candidate by cycle length until it's in the future (>= tomorrow to avoid flicker during the day?)
+      while (candidate.getTime() <= now.getTime()) {
+        candidate.setDate(candidate.getDate() + cycleLen)
+      }
+      const iso = candidate.toISOString()
+      if (nextPeriod !== iso) setNextPeriod(iso)
+    } catch (e) {
+      // silent
+    }
+  }, [menstrualLogs, averageCycle, timeTick])
 
 
   // Fetch menstrual insights when tab is 'insights' or userId changes
@@ -138,52 +196,83 @@ const fetchMenstrualLogs = useCallback(async () => {
     )
   }
 
-const saveMenstrualEntry = async () => {
-  if (!cycleStartDate) {
-    Alert.alert("Missing Information", "Please enter your cycle start date.");
-    return;
+  const isEligibleToLog = (() => {
+    if (!menstrualLogs.length) return true // first log allowed
+    if (!nextPeriod) return true
+    const today = new Date()
+    return today.getTime() >= new Date(nextPeriod).getTime()
+  })()
+
+  // Format date input as YYYY-MM-DD while user types
+  const formatCycleDateInput = (text: string) => {
+    const cleaned = text.replace(/\D/g, "") // digits only
+    if (cleaned.length <= 4) return cleaned
+    if (cleaned.length <= 6) return `${cleaned.slice(0, 4)}-${cleaned.slice(4)}`
+    return `${cleaned.slice(0, 4)}-${cleaned.slice(4, 6)}-${cleaned.slice(6, 8)}`
   }
 
-  try {
-    const token = await AsyncStorage.getItem("token");
-    const id = await AsyncStorage.getItem("userId"); // UUID
-
-    if (!id || !token) {
-      Alert.alert("Error", "Missing user ID or token.");
-      return;
+  const saveMenstrualEntry = async () => {
+    if (!cycleStartDate) {
+      Alert.alert("Missing Information", "Please enter your cycle start date.")
+      return
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(cycleStartDate)) {
+      Alert.alert("Invalid Date", "Please use the format YYYY-MM-DD.")
+      return
+    }
+    // Prevent logging future or premature cycles
+    if (!isEligibleToLog) {
+      Alert.alert("Not Yet", "You can only log a new period when the next estimated date arrives.")
+      return
+    }
+    if (new Date(cycleStartDate).getTime() > Date.now()) {
+      Alert.alert("Invalid Date", "Cycle start date can't be in the future.")
+      return
     }
 
-    const res = await fetch("https://pregwell-backend.onrender.com/api/menstrual-logs", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        user_id: id, // Keep as string
-        cycle_start_date: cycleStartDate,
-        flow_intensity: flowIntensity,
-        symptoms: selectedSymptoms.join(", "),
-        notes: cycleNotes,
-      }),
-    });
+    try {
+      const token = await AsyncStorage.getItem("token")
+      const id = await AsyncStorage.getItem("userId") // UUID
 
-    if (!res.ok) {
-      const errorData = await res.json();
-      throw new Error(`HTTP error! status: ${res.status}, message: ${errorData.message || "Unknown error"}`);
+      if (!id || !token) {
+        Alert.alert("Error", "Missing user ID or token.")
+        return
+      }
+
+      const res = await fetch("https://pregwell-backend.onrender.com/api/menstrual-logs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          user_id: id, // Keep as string
+          cycle_start_date: cycleStartDate,
+          flow_intensity: flowIntensity,
+          symptoms: selectedSymptoms.join(", "),
+          notes: cycleNotes,
+        }),
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(`HTTP error! status: ${res.status}, message: ${errorData.message || "Unknown error"}`)
+      }
+
+      Alert.alert("Success", "Menstrual cycle entry saved successfully!")
+      // Reset form
+      setCycleStartDate("")
+      setFlowIntensity("medium")
+      setSelectedSymptoms([])
+      setCycleNotes("")
+      // Refresh logs & switch to calendar view to show updated prediction
+      fetchMenstrualLogs()
+      setSelectedTab("calendar")
+    } catch (error: any) {
+      console.error("Error saving menstrual entry:", error.message)
+      Alert.alert("Error", `Failed to save menstrual entry: ${error.message}`)
     }
-
-    Alert.alert("Success", "Menstrual cycle entry saved successfully!");
-    // Reset form
-    setCycleStartDate("");
-    setFlowIntensity("medium");
-    setSelectedSymptoms([]);
-    setCycleNotes("");
-  } catch (error: any) {
-    console.error("Error saving menstrual entry:", error.message);
-    Alert.alert("Error", `Failed to save menstrual entry: ${error.message}`);
   }
-};
 
 
   const formatLogDate = (dateString: string) => {
@@ -251,8 +340,8 @@ const saveMenstrualEntry = async () => {
       <View style={styles.tabContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContent}>
           {[
-            { id: "tracker", label: "Log Period", icon: "add-circle" },
             { id: "calendar", label: "Cycle View", icon: "calendar" },
+            { id: "tracker", label: "Log Period", icon: "add-circle" },
             { id: "insights", label: "Insights", icon: "analytics" },
           ].map((tab) => (
             <TouchableOpacity
@@ -261,7 +350,7 @@ const saveMenstrualEntry = async () => {
               onPress={() => setSelectedTab(tab.id)}
             >
               <Ionicons
-                name={tab.icon}
+                name={tab.icon as any}
                 size={16}
                 color={selectedTab === tab.id ? "white" : "#7F8C8D"}
                 style={styles.tabIcon}
@@ -275,7 +364,7 @@ const saveMenstrualEntry = async () => {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {selectedTab === "tracker" && (
+  {selectedTab === "tracker" && (
           <View style={styles.trackerSection}>
             <Text style={styles.sectionTitle}>Log Your Period</Text>
             <Text style={styles.sectionSubtitle}>Track the return of your menstrual cycle after childbirth</Text>
@@ -292,10 +381,13 @@ const saveMenstrualEntry = async () => {
                   <Text style={styles.inputLabel}>Last Period Start Date</Text>
                   <TextInput
                     style={styles.textInput}
-                    placeholder="MM/DD/YYYY"
+                    placeholder="YYYY-MM-DD"
                     value={cycleStartDate}
-                    onChangeText={setCycleStartDate}
+                    onChangeText={(t) => setCycleStartDate(formatCycleDateInput(t))}
+                    keyboardType="number-pad"
+                    maxLength={10}
                   />
+                  <Text style={styles.helperText}>Format: YYYY-MM-DD</Text>
                 </View>
 
                 <View style={styles.inputGroup}>
@@ -313,7 +405,7 @@ const saveMenstrualEntry = async () => {
                         activeOpacity={0.7}
                       >
                         <Ionicons
-                          name={flow.icon}
+                          name={flow.icon as any}
                           size={18}
                           color={flowIntensity === flow.key ? "#FF9800" : "#7F8C8D"}
                         />
@@ -341,7 +433,7 @@ const saveMenstrualEntry = async () => {
                         activeOpacity={0.7}
                       >
                         <Ionicons
-                          name={symptom.icon}
+                          name={symptom.icon as any}
                           size={16}
                           color={selectedSymptoms.includes(symptom.id) ? "#FF9800" : "#7F8C8D"}
                         />
@@ -370,12 +462,22 @@ const saveMenstrualEntry = async () => {
                   />
                 </View>
 
-                <TouchableOpacity style={styles.saveButton} onPress={saveMenstrualEntry} activeOpacity={0.8}>
+                <TouchableOpacity
+                  style={[styles.saveButton, !isEligibleToLog && { opacity: 0.5 }]}
+                  onPress={saveMenstrualEntry}
+                  activeOpacity={0.8}
+                  disabled={!isEligibleToLog}
+                >
                   <LinearGradient colors={["#FF9800", "#F57C00"]} style={styles.saveButtonGradient}>
                     <Ionicons name="checkmark-circle" size={20} color="white" />
                     <Text style={styles.saveButtonText}>Save Entry</Text>
                   </LinearGradient>
                 </TouchableOpacity>
+                {!isEligibleToLog && nextPeriod && (
+                  <Text style={{ marginTop: 10, fontSize: 12, color: "#7F8C8D", textAlign: "center" }}>
+                    You can log your next period on {new Date(nextPeriod).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </Text>
+                )}
               </LinearGradient>
             </View>
           </View>
@@ -464,13 +566,13 @@ const saveMenstrualEntry = async () => {
                     style={styles.insightGradient}
                   >
                     <Ionicons
-                      name={
+                      name={(
                         insight.category === "Postpartum"
                           ? "information-circle"
                           : insight.category === "Breastfeeding"
                             ? "baby"
                             : "medical"
-                      }
+                      ) as any}
                       size={24}
                       color={
                         insight.category === "Postpartum"
@@ -696,6 +798,12 @@ const styles = StyleSheet.create({
   textArea: {
     height: 80,
     textAlignVertical: "top",
+  },
+  helperText: {
+    fontSize: 11,
+    color: "#7F8C8D",
+    marginTop: 4,
+    marginLeft: 2,
   },
   flowOptions: {
     flexDirection: "row",
