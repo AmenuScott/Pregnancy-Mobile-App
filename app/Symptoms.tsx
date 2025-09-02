@@ -6,7 +6,6 @@ import { LinearGradient } from "expo-linear-gradient"
 import { useRouter } from "expo-router"
 import { useEffect, useRef, useState } from "react"
 import {
-  ActivityIndicator,
   Alert,
   Animated,
   Dimensions,
@@ -14,7 +13,6 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -22,7 +20,8 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  TouchableWithoutFeedback,
+  View,
 } from "react-native"
 
 const { width, height } = Dimensions.get("window")
@@ -39,11 +38,6 @@ interface Symptom {
 interface CustomSymptom {
   id: string
   name: string
-}
-
-interface ChatbotAdvice {
-  advice: string
-  timestamp: Date
 }
 
 const symptoms: Symptom[] = [
@@ -143,8 +137,6 @@ export default function SymptomsScreen() {
   const [newSymptom, setNewSymptom] = useState<string>("")
   const [isInputFocused, setIsInputFocused] = useState(false)
   const [keyboardVisible, setKeyboardVisible] = useState(false)
-  const [chatbotAdvice, setChatbotAdvice] = useState<ChatbotAdvice | null>(null)
-  const [isLoadingAdvice, setIsLoadingAdvice] = useState(false)
 
   // Add user data and pregnancy data state
   const [userData, setUserData] = useState<{ firstName: string; lastMenstrualPeriod: string; profilePicture?: string } | null>(null)
@@ -235,32 +227,6 @@ export default function SymptomsScreen() {
     }
   }
 
-  const getChatbotAdvice = async (symptom: string) => {
-    setIsLoadingAdvice(true)
-    try {
-      const response = await fetch("http://localhost:5000/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: `I am experiencing this pregnancy symptom: ${symptom}. What should I do? Keep the response concise.`
-        }),
-      })
-
-      const data = await response.json()
-      setChatbotAdvice({
-        advice: data.response,
-        timestamp: new Date()
-      })
-    } catch (error) {
-      console.error("Error getting advice:", error)
-      Alert.alert("Error", "Could not get advice at this time. Please try again later.")
-    } finally {
-      setIsLoadingAdvice(false)
-    }
-  }
-
   const addCustomSymptom = () => {
     if (newSymptom.trim() === "") return
 
@@ -272,7 +238,12 @@ export default function SymptomsScreen() {
 
     setCustomSymptoms([...customSymptoms, newCustomSymptom])
     setNewSymptom("")
+
+    // Dismiss keyboard after adding
     dismissKeyboard()
+
+    // Show success feedback
+    Alert.alert("Added!", `"${newCustomSymptom.name}" has been added to your symptoms.`)
   }
 
   const removeCustomSymptom = (id: string) => {
@@ -284,44 +255,25 @@ export default function SymptomsScreen() {
     }
   }
 
-  const handleContinue = async () => {
+  const handleContinue = () => {
     if (selectedSymptoms.length > 0 || customSymptoms.length > 0) {
-      // Dismiss keyboard before proceeding
+      // Dismiss keyboard before navigation
       dismissKeyboard()
-      setIsLoadingAdvice(true)
 
-      try {
-        // Combine selected and custom symptoms
-        const selectedSymptomNames = selectedSymptoms.map(id => 
-          symptoms.find(s => s.id === id)?.name || ''
-        ).filter(name => name !== '')
-        
-        const allSymptoms = [...selectedSymptomNames, ...customSymptoms.map(s => s.name)]
-        const symptomsText = allSymptoms.join(", ")
+      // Convert array to comma-separated string for URL params
+      const symptomsParam = selectedSymptoms.join(",")
 
-        // Format message for the chatbot
-        const formData = new FormData()
-        formData.append("msg", `I am experiencing these pregnancy symptoms: ${symptomsText}. What should I do? Please provide specific advice for each symptom.`)
+      // Convert custom symptoms to JSON string
+      const customSymptomsParam = JSON.stringify(customSymptoms)
 
-        const response = await fetch("http://10.232.142.207:8080/get", {
-          method: "POST",
-          body: formData,
-        })
-
-        const botText = await response.text()
-        setChatbotAdvice({
-          advice: botText,
-          timestamp: new Date()
-        })
-
-        // Scroll to show the advice
-        scrollViewRef.current?.scrollToEnd({ animated: true })
-      } catch (error) {
-        console.error("Error getting advice:", error)
-        Alert.alert("Error", "Could not get advice at this time. Please try again later.")
-      } finally {
-        setIsLoadingAdvice(false)
-      }
+      router.push({
+        pathname: "/Advice",
+        params: {
+          symptoms: symptomsParam,
+          customSymptoms: customSymptomsParam,
+          trimester: pregnancyInfo?.trimester, // <-- add this
+        },
+      })
     }
   }
 
@@ -388,229 +340,203 @@ export default function SymptomsScreen() {
   )
 
   return (
-    <View style={{ flex: 1 }}>
+    <>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      <LinearGradient colors={["#E8EAF6", "#F3E5F5", "#FCE4EC"]} style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          {/* Header */}
-          <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
-            <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.7}>
-              <LinearGradient
-                colors={["rgba(255,255,255,0.3)", "rgba(255,255,255,0.1)"]}
-                style={styles.backButtonGradient}
-              >
-                <Ionicons name="chevron-back" size={24} color="#9C27B0" />
-              </LinearGradient>
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Pregnancy Symptoms</Text>
-            <View style={styles.placeholder} />
-          </Animated.View>
-
-          {/* Profile Section - Hide when keyboard is visible */}
-          {!keyboardVisible && (
-            <Animated.View style={[styles.profileSection, { opacity: fadeAnim }]}>
-              <View style={styles.profileImageContainer}>
-                {userData?.profilePicture ? (
-                  <Image source={{ uri: userData.profilePicture }} style={styles.profileImage} />
-                ) : (
-                  <View
-                    style={[
-                      styles.profileImage,
-                      { backgroundColor: "#E1BEE7", justifyContent: "center", alignItems: "center" },
-                    ]}
-                  >
-                    <Text style={{ fontSize: 28, color: "#9C27B0", fontWeight: "bold" }}>
-                      {getInitials(userData?.firstName || "U")}
-                    </Text>
-                  </View>
-                )}
-                <View style={styles.profileImageBorder} />
-              </View>
-              <View style={styles.profileInfo}>
-                <Text style={styles.welcomeText}>Hello, how are you feeling?</Text>
-                <Text style={styles.nameText}>
-                  {userData?.firstName ? userData.firstName : "User"}
-                </Text>
-                {pregnancyInfo && (
-                  <View style={styles.weekContainer}>
-                    <Ionicons name="calendar-outline" size={16} color="#9C27B0" />
-                    <Text style={styles.weekText}>
-                      Week {pregnancyInfo.week} • {pregnancyInfo.trimester}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </Animated.View>
-          )}
-
-          {/* Content Container */}
-          <KeyboardAvoidingView
-            style={styles.keyboardAvoidingView}
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
-            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
-            enabled
-          >
-            <Animated.View style={[styles.contentContainer, { opacity: fadeAnim }]}>
-              <View style={styles.titleContainer}>
-                <Text style={styles.title}>What symptoms are you experiencing?</Text>
-                <Text style={styles.subtitle}>Select all that apply to get personalized advice</Text>
-              </View>
-
-              <ScrollView
-                ref={scrollViewRef}
-                style={styles.symptomsContainer}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="always"
-                keyboardDismissMode="interactive"
-                contentContainerStyle={styles.scrollContent}
-              >
-                <View style={styles.symptomsGrid}>{symptoms.map((symptom) => renderSymptomCard(symptom))}</View>
-
-                {/* Custom Symptoms Section */}
-                <View style={styles.customSymptomsSection}>
-                  <LinearGradient colors={["#F3E5F5", "#FFFFFF"]} style={styles.customSymptomsGradient}>
-                    <View style={styles.customSymptomsHeader}>
-                      <Ionicons name="add-circle-outline" size={24} color="#9C27B0" />
-                      <View style={styles.customSymptomsHeaderText}>
-                        <Text style={styles.customSymptomsTitle}>Don't see your symptom?</Text>
-                        <Text style={styles.customSymptomsSubtitle}>Add your own symptoms below</Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.customSymptomInputContainer}>
-                      <Pressable 
-                        style={[styles.inputWrapper, isInputFocused && styles.inputWrapperFocused]}
-                        onPress={() => textInputRef.current?.focus()}
-                      >
-                        <Ionicons
-                          name="create-outline"
-                          size={20}
-                          color={isInputFocused ? "#9C27B0" : "#BDC3C7"}
-                          style={styles.inputIcon}
-                        />
-                        <TextInput
-                          ref={textInputRef}
-                          style={styles.customSymptomInput}
-                          placeholder="Enter your symptom..."
-                          value={newSymptom}
-                          onChangeText={setNewSymptom}
-                          onFocus={() => {
-                            setIsInputFocused(true);
-                            scrollViewRef.current?.scrollToEnd({ animated: true });
-                          }}
-                          onBlur={() => setIsInputFocused(false)}
-                          placeholderTextColor="#9e9e9e"
-                          returnKeyType="done"
-                          onSubmitEditing={addCustomSymptom}
-                          blurOnSubmit={true}
-                          autoCorrect={false}
-                          keyboardType="default"
-                          multiline={false}
-                        />
-                      </Pressable>
-                      
-                      <TouchableOpacity
-                        style={[
-                          styles.addSymptomButton,
-                          newSymptom.trim() === "" && styles.addSymptomButtonDisabled,
-                        ]}
-                        onPress={addCustomSymptom}
-                        disabled={newSymptom.trim() === ""}
-                        activeOpacity={0.8}
-                      >
-                        <LinearGradient colors={["#9C27B0", "#7B1FA2"]} style={styles.addSymptomButtonGradient}>
-                          <Ionicons name="add" size={24} color="#fff" />
-                        </LinearGradient>
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Display Custom Symptoms */}
-                    {/* Chatbot Advice */}
-                    {isLoadingAdvice && (
-                      <View style={styles.adviceContainer}>
-                        <ActivityIndicator color="#9C27B0" size="small" />
-                        <Text style={styles.loadingText}>Getting advice...</Text>
-                      </View>
-                    )}
-
-                    {chatbotAdvice && (
-                      <View style={styles.adviceContainer}>
-                        <View style={styles.adviceHeader}>
-                          <Ionicons name="medical" size={20} color="#9C27B0" />
-                          <Text style={styles.adviceTitle}>Suggested Advice</Text>
-                        </View>
-                        <Text style={styles.adviceText}>{chatbotAdvice.advice}</Text>
-                      </View>
-                    )}
-
-                    {customSymptoms.length > 0 && (
-                      <View style={styles.customSymptomsList}>
-                        <Text style={styles.customSymptomsListTitle}>Your custom symptoms:</Text>
-                        {customSymptoms.map((symptom) => (
-                          <View key={symptom.id} style={styles.customSymptomItem}>
-                            <View style={styles.customSymptomBadge}>
-                              <View style={styles.customSymptomIconContainer}>
-                                <Ionicons name="add-circle" size={18} color="#9C27B0" />
-                              </View>
-                              <Text style={styles.customSymptomName}>{symptom.name}</Text>
-                            </View>
-                            <TouchableOpacity
-                              onPress={() => removeCustomSymptom(symptom.id)}
-                              style={styles.removeSymptomButton}
-                              activeOpacity={0.7}
-                            >
-                              <Ionicons name="close-circle" size={22} color="#FF5722" />
-                            </TouchableOpacity>
-                          </View>
-                        ))}
-                      </View>
-                    )}
-                  </LinearGradient>
-                </View>
-
-                {/* Extra space for keyboard */}
-                <View style={styles.bottomSpacing} />
-              </ScrollView>
-
-              {/* Continue Button - Fixed at bottom */}
-              <View style={styles.continueButtonContainer}>
-                <TouchableOpacity
-                  style={[styles.continueButton, isButtonDisabled && styles.disabledButton]}
-                  onPress={handleContinue}
-                  disabled={isButtonDisabled}
-                  activeOpacity={0.8}
-                >
+      <TouchableWithoutFeedback onPress={dismissKeyboard}>
+        <View style={{ flex: 1 }}>
+          <LinearGradient colors={["#E8EAF6", "#F3E5F5", "#FCE4EC"]} style={styles.container}>
+            <SafeAreaView style={styles.safeArea}>
+              {/* Header */}
+              <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
+                <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.7}>
                   <LinearGradient
-                    colors={isButtonDisabled ? ["#E1BEE7", "#E1BEE7"] : ["#9C27B0", "#7B1FA2"]}
-                    style={styles.continueButtonGradient}
+                    colors={["rgba(255,255,255,0.3)", "rgba(255,255,255,0.1)"]}
+                    style={styles.backButtonGradient}
                   >
-                    <Text style={[styles.continueButtonText, isButtonDisabled && styles.disabledButtonText]}>
-                      Get Personalized Advice
-                    </Text>
-                    <Ionicons
-                      name="arrow-forward"
-                      size={20}
-                      color={isButtonDisabled ? "#BDC3C7" : "#fff"}
-                      style={styles.continueButtonIcon}
-                    />
+                    <Ionicons name="chevron-back" size={24} color="#9C27B0" />
                   </LinearGradient>
                 </TouchableOpacity>
+                <Text style={styles.headerTitle}>Pregnancy Symptoms</Text>
+                <View style={styles.placeholder} />
+              </Animated.View>
 
-                {/* Selected Count */}
-                {(selectedSymptoms.length > 0 || customSymptoms.length > 0) && (
-                  <View style={styles.selectedCountContainer}>
-                    <Text style={styles.selectedCountText}>
-                      {selectedSymptoms.length + customSymptoms.length} symptom
-                      {selectedSymptoms.length + customSymptoms.length !== 1 ? "s" : ""} selected
-                    </Text>
+              {/* Profile Section - Hide when keyboard is visible */}
+              {!keyboardVisible && (
+                <Animated.View style={[styles.profileSection, { opacity: fadeAnim }]}>
+                  <View style={styles.profileImageContainer}>
+                    {userData?.profilePicture ? (
+                      <Image source={{ uri: userData.profilePicture }} style={styles.profileImage} />
+                    ) : (
+                      <View
+                        style={[
+                          styles.profileImage,
+                          { backgroundColor: "#E1BEE7", justifyContent: "center", alignItems: "center" },
+                        ]}
+                      >
+                        <Text style={{ fontSize: 28, color: "#9C27B0", fontWeight: "bold" }}>
+                          {getInitials(userData?.firstName || "U")}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={styles.profileImageBorder} />
                   </View>
-                )}
-              </View>
-            </Animated.View>
-          </KeyboardAvoidingView>
-        </SafeAreaView>
-      </LinearGradient>
-    </View>
+                  <View style={styles.profileInfo}>
+                    <Text style={styles.welcomeText}>Hello, how are you feeling?</Text>
+                    <Text style={styles.nameText}>
+                      {userData?.firstName ? userData.firstName : "User"}
+                    </Text>
+                    {pregnancyInfo && (
+                      <View style={styles.weekContainer}>
+                        <Ionicons name="calendar-outline" size={16} color="#9C27B0" />
+                        <Text style={styles.weekText}>
+                          Week {pregnancyInfo.week} • {pregnancyInfo.trimester}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </Animated.View>
+              )}
+
+              {/* Content Container */}
+              <KeyboardAvoidingView
+                style={styles.keyboardAvoidingView}
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+              >
+                <Animated.View style={[styles.contentContainer, { opacity: fadeAnim }]}>
+                  <View style={styles.titleContainer}>
+                    <Text style={styles.title}>What symptoms are you experiencing?</Text>
+                    <Text style={styles.subtitle}>Select all that apply to get personalized advice</Text>
+                  </View>
+
+                  <ScrollView
+                    ref={scrollViewRef}
+                    style={styles.symptomsContainer}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    contentContainerStyle={styles.scrollContent}
+                  >
+                    <View style={styles.symptomsGrid}>{symptoms.map((symptom) => renderSymptomCard(symptom))}</View>
+
+                    {/* Custom Symptoms Section */}
+                    <View style={styles.customSymptomsSection}>
+                      <LinearGradient colors={["#F3E5F5", "#FFFFFF"]} style={styles.customSymptomsGradient}>
+                        <View style={styles.customSymptomsHeader}>
+                          <Ionicons name="add-circle-outline" size={24} color="#9C27B0" />
+                          <View style={styles.customSymptomsHeaderText}>
+                            <Text style={styles.customSymptomsTitle}>Don't see your symptom?</Text>
+                            <Text style={styles.customSymptomsSubtitle}>Add your own symptoms below</Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.customSymptomInputContainer}>
+                          <View style={[styles.inputWrapper, isInputFocused && styles.inputWrapperFocused]}>
+                            <Ionicons
+                              name="create-outline"
+                              size={20}
+                              color={isInputFocused ? "#9C27B0" : "#BDC3C7"}
+                              style={styles.inputIcon}
+                            />
+                            <TextInput
+                              ref={textInputRef}
+                              style={styles.customSymptomInput}
+                              placeholder="Enter your symptom..."
+                              value={newSymptom}
+                              onChangeText={setNewSymptom}
+                              onFocus={() => setIsInputFocused(true)}
+                              onBlur={() => setIsInputFocused(false)}
+                              placeholderTextColor="#9e9e9e"
+                              returnKeyType="done"
+                              onSubmitEditing={addCustomSymptom}
+                              blurOnSubmit={true}
+                            />
+                          </View>
+                          <TouchableOpacity
+                            style={[
+                              styles.addSymptomButton,
+                              newSymptom.trim() === "" && styles.addSymptomButtonDisabled,
+                            ]}
+                            onPress={addCustomSymptom}
+                            disabled={newSymptom.trim() === ""}
+                            activeOpacity={0.8}
+                          >
+                            <LinearGradient colors={["#9C27B0", "#7B1FA2"]} style={styles.addSymptomButtonGradient}>
+                              <Ionicons name="add" size={24} color="#fff" />
+                            </LinearGradient>
+                          </TouchableOpacity>
+                        </View>
+
+                        {/* Display Custom Symptoms */}
+                        {customSymptoms.length > 0 && (
+                          <View style={styles.customSymptomsList}>
+                            <Text style={styles.customSymptomsListTitle}>Your custom symptoms:</Text>
+                            {customSymptoms.map((symptom) => (
+                              <View key={symptom.id} style={styles.customSymptomItem}>
+                                <View style={styles.customSymptomBadge}>
+                                  <View style={styles.customSymptomIconContainer}>
+                                    <Ionicons name="add-circle" size={18} color="#9C27B0" />
+                                  </View>
+                                  <Text style={styles.customSymptomName}>{symptom.name}</Text>
+                                </View>
+                                <TouchableOpacity
+                                  onPress={() => removeCustomSymptom(symptom.id)}
+                                  style={styles.removeSymptomButton}
+                                  activeOpacity={0.7}
+                                >
+                                  <Ionicons name="close-circle" size={22} color="#FF5722" />
+                                </TouchableOpacity>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                      </LinearGradient>
+                    </View>
+
+                    {/* Extra space for keyboard */}
+                    <View style={styles.bottomSpacing} />
+                  </ScrollView>
+
+                  {/* Continue Button - Fixed at bottom */}
+                  <View style={styles.continueButtonContainer}>
+                    <TouchableOpacity
+                      style={[styles.continueButton, isButtonDisabled && styles.disabledButton]}
+                      onPress={handleContinue}
+                      disabled={isButtonDisabled}
+                      activeOpacity={0.8}
+                    >
+                      <LinearGradient
+                        colors={isButtonDisabled ? ["#E1BEE7", "#E1BEE7"] : ["#9C27B0", "#7B1FA2"]}
+                        style={styles.continueButtonGradient}
+                      >
+                        <Text style={[styles.continueButtonText, isButtonDisabled && styles.disabledButtonText]}>
+                          Get Personalized Advice
+                        </Text>
+                        <Ionicons
+                          name="arrow-forward"
+                          size={20}
+                          color={isButtonDisabled ? "#BDC3C7" : "#fff"}
+                          style={styles.continueButtonIcon}
+                        />
+                      </LinearGradient>
+                    </TouchableOpacity>
+
+                    {/* Selected Count */}
+                    {(selectedSymptoms.length > 0 || customSymptoms.length > 0) && (
+                      <View style={styles.selectedCountContainer}>
+                        <Text style={styles.selectedCountText}>
+                          {selectedSymptoms.length + customSymptoms.length} symptom
+                          {selectedSymptoms.length + customSymptoms.length !== 1 ? "s" : ""} selected
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </Animated.View>
+              </KeyboardAvoidingView>
+            </SafeAreaView>
+          </LinearGradient>
+        </View>
+      </TouchableWithoutFeedback>
+    </>
   )
 }
 
@@ -842,7 +768,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 15,
-    minHeight: 50,
   },
   inputWrapper: {
     flex: 1,
@@ -854,7 +779,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "transparent",
     minHeight: 50,
-    paddingVertical: 0,
   },
   inputWrapperFocused: {
     borderColor: "#9C27B0",
@@ -873,8 +797,6 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     fontSize: 16,
     color: "#2C3E50",
-    textAlignVertical: 'center',
-    minHeight: 50,
   },
   addSymptomButton: {
     marginLeft: 12,
@@ -987,39 +909,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#9C27B0",
     fontWeight: "600",
-  },
-  adviceContainer: {
-    backgroundColor: "#fff",
-    borderRadius: 15,
-    padding: 16,
-    marginTop: 15,
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  adviceHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  adviceTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#2C3E50",
-    marginLeft: 8,
-  },
-  adviceText: {
-    fontSize: 16,
-    color: "#2C3E50",
-    lineHeight: 24,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: "#9C27B0",
-    marginLeft: 12,
-    marginTop: 8,
   },
 })

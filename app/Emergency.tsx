@@ -46,7 +46,6 @@ export default function EmergencyScreen() {
   const [description, setDescription] = useState("")
   const [showForm, setShowForm] = useState(false)
   const [userLocation, setUserLocation] = useState<Location.LocationObjectCoords | null>(null) // Explicitly type userLocation
-  const [savingContact, setSavingContact] = useState(false)
 
   // Function to fetch contacts - wrapped in useCallback
   const fetchContacts = useCallback(async () => {
@@ -74,28 +73,10 @@ export default function EmergencyScreen() {
 
   useEffect(() => {
     const loadUserId = async () => {
-      try {
-        // Consolidate possible keys used elsewhere in the app
-        const possibleKeys = ["userId", "user_Id", "user_id", "user"]
-        for (const key of possibleKeys) {
-          const value = await AsyncStorage.getItem(key)
-          if (value) {
-            // Some keys store plain id (string/number), others may store JSON user object
-            if (/^\d+$/.test(value) || value.length < 40) {
-              setUserId(value.toString())
-              break
-            }
-            try {
-              const parsed = JSON.parse(value)
-              if (parsed?.id) {
-                setUserId(parsed.id.toString())
-                break
-              }
-            } catch {}
-          }
-        }
-      } catch (e) {
-        console.log("Failed to load user id", e)
+      const storedUser = await AsyncStorage.getItem("user")
+      const parsed = storedUser ? JSON.parse(storedUser) : null
+      if (parsed?.id) {
+        setUserId(parsed.id)
       }
     }
     loadUserId()
@@ -140,7 +121,7 @@ export default function EmergencyScreen() {
   // Add a new emergency contact
   const handleAddContact = async () => {
     if (!userId) {
-      Alert.alert("Login Required", "Please login first before adding an emergency contact.")
+      Alert.alert("Error", "User not logged in. Cannot add contact.")
       return
     }
     if (!name.trim() || !number.trim()) {
@@ -148,7 +129,6 @@ export default function EmergencyScreen() {
       return
     }
     try {
-      setSavingContact(true)
       const res = await fetch(`https://pregwell-backend.onrender.com/api/emergency_contacts/${userId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -165,8 +145,6 @@ export default function EmergencyScreen() {
     } catch (err) {
       console.log("Error adding contact:", err)
       Alert.alert("Failed to add contact", "Server unreachable or error occurred.")
-    } finally {
-      setSavingContact(false)
     }
   }
 
@@ -435,11 +413,6 @@ export default function EmergencyScreen() {
               <View style={s.formContainer}>
                 <LinearGradient colors={["#F3E5F5", "#FFFFFF"]} style={s.formGradient}>
                   <Text style={s.formTitle}>Add Emergency Contact</Text>
-                  {!userId && (
-                    <Text style={s.loginWarning}>
-                      You are not logged in. Contacts will not be saved until you login.
-                    </Text>
-                  )}
                   <TextInput
                     placeholder="Contact Name *"
                     value={name}
@@ -466,22 +439,9 @@ export default function EmergencyScreen() {
                     <TouchableOpacity style={s.cancelButton} onPress={() => setShowForm(false)}>
                       <Text style={s.cancelButtonText}>Cancel</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[s.saveButton, savingContact && { opacity: 0.7 }]}
-                      onPress={savingContact ? undefined : handleAddContact}
-                      disabled={savingContact}
-                      accessibilityRole="button"
-                      accessibilityLabel={savingContact ? "Saving contact" : "Save contact"}
-                    >
+                    <TouchableOpacity style={s.saveButton} onPress={handleAddContact}>
                       <LinearGradient colors={["#9C27B0", "#7B1FA2"]} style={s.saveButtonGradient}>
-                        {savingContact ? (
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <ActivityIndicator color="white" size="small" />
-                            <Text style={s.saveButtonText}>Saving...</Text>
-                          </View>
-                        ) : (
-                          <Text style={s.saveButtonText}>Save Contact</Text>
-                        )}
+                        <Text style={s.saveButtonText}>Save Contact</Text>
                       </LinearGradient>
                     </TouchableOpacity>
                   </View>
@@ -783,17 +743,6 @@ const s = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontWeight: "bold",
-  },
-  loginWarning: {
-    backgroundColor: '#FFF3CD',
-    borderColor: '#FFEEBA',
-    borderWidth: 1,
-    padding: 10,
-    borderRadius: 10,
-    color: '#8A6D3B',
-    fontSize: 12,
-    marginBottom: 12,
-    textAlign: 'center'
   },
   contactCard: {
     flexDirection: "row",
