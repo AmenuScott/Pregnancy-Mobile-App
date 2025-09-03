@@ -26,6 +26,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native"
+import { track } from "../lib/analytics"
 
 const { width } = Dimensions.get("window")
 const statusBarHeight = Platform.OS === "ios" ? 44 : StatusBar.currentHeight || 24
@@ -178,6 +179,7 @@ const BabyCareScreen = () => {
     setBabyDOB("")
     Alert.alert("Success", "Baby's birth date saved!")
     if (userId) fetchPersonalizedTips(userId, babyDOB) // Fetch personalized tips after saving DOB
+  track("baby_dob_saved", { dob: babyDOB })
   }
 
   // Auto-format YYYY-MM-DD while typing

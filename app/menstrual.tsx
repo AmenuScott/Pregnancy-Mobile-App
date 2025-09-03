@@ -19,6 +19,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native"
+import { track } from "../lib/analytics"
 
 const { width } = Dimensions.get("window")
 const statusBarHeight = Platform.OS === "ios" ? 44 : StatusBar.currentHeight || 24
@@ -268,6 +269,7 @@ const MenstrualScreen = () => {
       // Refresh logs & switch to calendar view to show updated prediction
       fetchMenstrualLogs()
       setSelectedTab("calendar")
+  track("menstrual_logged", {})
     } catch (error: any) {
       console.error("Error saving menstrual entry:", error.message)
       Alert.alert("Error", `Failed to save menstrual entry: ${error.message}`)

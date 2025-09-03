@@ -1,6 +1,7 @@
 "use client"
 
 import { Ionicons } from "@expo/vector-icons"
+import { track } from "../../lib/analytics"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router"
 import { useCallback, useEffect, useRef, useState } from "react"
@@ -259,6 +260,7 @@ const handleSend = async () => {
   // Add to UI immediately
   setMessages((prev) => [...prev, message]);
   socket.emit("send_message", message);
+  track("chat_message_sent", { length: message.content.length });
   
   // Send notification to receiver
   await sendNotificationToReceiver(receiverIdString, text.trim());

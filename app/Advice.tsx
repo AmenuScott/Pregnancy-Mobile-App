@@ -182,7 +182,7 @@ interface RouteParams {
 
 export default function AdviceScreen() {
   // Get the symptoms parameter from the URL
-  const params = useLocalSearchParams<RouteParams>();
+  const params = useLocalSearchParams() as RouteParams;
   const symptomsParam = params.symptoms;
   const customSymptomsParam = params.customSymptoms;
   const trimesterParam = params.trimester;
@@ -240,7 +240,11 @@ export default function AdviceScreen() {
       const symptomName = symptoms.find(s => s.id === symptomId)?.name;
       
       if (symptomName) {
-        const trimesterAdvice = adviceBySymptomAndTrimester[symptomName]?.[trimesterParam];
+        const symptomAdvice = adviceBySymptomAndTrimester[symptomName as keyof typeof adviceBySymptomAndTrimester];
+        const trimesterKey = (trimesterParam === "1st Trimester" || trimesterParam === "2nd Trimester" || trimesterParam === "3rd Trimester")
+          ? trimesterParam as "1st Trimester" | "2nd Trimester" | "3rd Trimester"
+          : undefined;
+        const trimesterAdvice = trimesterKey ? symptomAdvice?.[trimesterKey] : undefined;
         advice.push({
           title: `Advice for ${symptomName}`,
           advice: trimesterAdvice

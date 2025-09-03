@@ -26,6 +26,7 @@ const babyProfileRoutes = require("./routes/babyProfileRoutes");
 const dietRoutes = require("./routes/dietRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const chatRoutes = require("./routes/chatRoutes");
+const analyticsRoutes = require("./routes/analyticsRoutes");
 
 const app = express();
 const server = http.createServer(app);
@@ -61,6 +62,7 @@ app.use("/api", babyProfileRoutes);
 app.use(dietRoutes);
 app.use(notificationRoutes);
 app.use("/api/chat", chatRoutes);
+app.use(analyticsRoutes);
 
 // Base route
 app.get("/", (req, res) => {

@@ -391,6 +391,13 @@ const HomeScreen = () => {
               colors: ["#FFF4E6", "#FFFAF0"],
               onPress: () => router.push("/Tips"),
             },
+            {
+              title: "Overview",
+              subtitle: "Your activity",
+              icon: "analytics-outline",
+              colors: ["#E3F2FD", "#F0F7FF"],
+              onPress: () => router.push("/Analytics"),
+            },
           ]}
         />
 

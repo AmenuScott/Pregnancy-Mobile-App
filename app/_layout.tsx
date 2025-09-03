@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
-import React, { ErrorInfo } from 'react';
+import React, { ErrorInfo, useEffect } from 'react';
+import { track } from '../lib/analytics';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -39,6 +40,9 @@ class ErrorBoundary extends React.Component<
 export default function RootLayout() {
   // Initialize push notifications (token registration & listeners)
   usePushNotifications();
+  useEffect(() => {
+    track('app_open', {});
+  }, []);
   return (
     <ErrorBoundary>
       <GestureHandlerRootView style={styles.container}>
