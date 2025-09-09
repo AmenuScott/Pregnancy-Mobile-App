@@ -93,7 +93,10 @@ const s = StyleSheet.create({
   },
   sectionTitle: { fontSize: 20, fontWeight: "bold", color: "#2C3E50" },
   grid: { flexDirection: "row", justifyContent: "space-between", marginHorizontal: 20, marginBottom: 20 },
+  threeColContainer: { flexDirection: 'row', justifyContent: 'space-between', marginHorizontal:20, marginBottom:20 },
+  column: { width: '48%' },
   card: { width: "48%", borderRadius: 18, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 6, elevation: 4 },
+  cardFull: { width: '100%' },
   cardContent: { padding: 20, borderRadius: 18, alignItems: "center" },
   iconContainer: {
     backgroundColor: "white",
@@ -179,10 +182,11 @@ type CardProps = {
   icon: string
   colors: [ColorValue, ColorValue, ...ColorValue[]]
   onPress: () => void
+  fullWidth?: boolean
 }
 
-const Card = ({ title, subtitle, icon, colors, onPress }: CardProps) => (
-  <TouchableOpacity style={s.card} onPress={onPress}>
+const Card = ({ title, subtitle, icon, colors, onPress, fullWidth }: CardProps) => (
+  <TouchableOpacity style={[s.card, fullWidth && s.cardFull]} onPress={onPress}>
     <LinearGradient colors={colors} style={s.cardContent}>
       <View style={s.iconContainer}>
         <Ionicons name={icon as any} size={28} color={typeof colors[0] === "string" ? colors[0].replace(/[^#]/g, "").slice(0, 7) : "#000"} />
@@ -516,11 +520,21 @@ const Section = ({
       <Text style={s.sectionTitle}>{title}</Text>
       <Ionicons name={icon as any} size={20} color="#C44569" />
     </View>
-    <View style={s.grid}>
-      {cards.map((card, idx) => (
-        <Card key={card.title + idx} {...card} />
-      ))}
-    </View>
+    {cards.length === 3 ? (
+      <View style={{ marginHorizontal:20, marginBottom:20 }}>
+        <View style={{ flexDirection:'row', justifyContent:'space-between', marginBottom:16 }}>
+          <Card {...cards[0]} />
+          <Card {...cards[1]} />
+        </View>
+        <Card {...cards[2]} fullWidth />
+      </View>
+    ) : (
+      <View style={s.grid}>
+        {cards.map((card, idx) => (
+          <Card key={card.title + idx} {...card} />
+        ))}
+      </View>
+    )}
   </>
 )
 

@@ -304,7 +304,7 @@ export default function SymptomsScreen() {
         const formData = new FormData()
         formData.append("msg", `I am experiencing these pregnancy symptoms: ${symptomsText}. What should I do? Please provide specific advice for each symptom.`)
 
-        const response = await fetch("http://10.232.66.19:8080/get", {
+        const response = await fetch("http://100.66.3.175:8080/get", {
           method: "POST",
           body: formData,
         })

@@ -15,7 +15,7 @@ const ALLOWED = new Set([
   'chat_message_sent'
 ]);
 
-router.post('/api/analytics', async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const { userId, name, ts, props } = req.body || {};
     if (!name || !ALLOWED.has(name)) {
