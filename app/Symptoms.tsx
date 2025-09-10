@@ -24,7 +24,7 @@ import {
   TouchableOpacity,
   View
 } from "react-native"
-import { track } from "../lib/analytics"
+import { track, logSymptom } from "../lib/analytics"
 
 const { width, height } = Dimensions.get("window")
 
@@ -287,7 +287,6 @@ export default function SymptomsScreen() {
 
   const handleContinue = async () => {
     if (selectedSymptoms.length > 0 || customSymptoms.length > 0) {
-      // Dismiss keyboard before proceeding
       dismissKeyboard()
       setIsLoadingAdvice(true)
 
@@ -299,6 +298,11 @@ export default function SymptomsScreen() {
         
         const allSymptoms = [...selectedSymptomNames, ...customSymptoms.map(s => s.name)]
         const symptomsText = allSymptoms.join(", ")
+
+        // Save each symptom to the database
+        for (const symptom of allSymptoms) {
+          await logSymptom(symptom)
+        }
 
         // Format message for the chatbot
         const formData = new FormData()
@@ -315,10 +319,9 @@ export default function SymptomsScreen() {
           timestamp: new Date()
         })
 
-  // Analytics event
-  track("symptom_logged", { count: allSymptoms.length, names: allSymptoms })
+        // Analytics event
+        track("symptom_logged", { count: allSymptoms.length, names: allSymptoms })
 
-        // Scroll to show the advice
         scrollViewRef.current?.scrollToEnd({ animated: true })
       } catch (error) {
         console.error("Error getting advice:", error)

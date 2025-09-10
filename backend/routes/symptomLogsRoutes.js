@@ -21,4 +21,16 @@ router.get('/per-day', async (req, res) => {
   res.json(data);
 });
 
+// Get total symptom logs count
+router.get('/total', async (req, res) => {
+  const { userId } = req.query;
+  if (!userId) return res.status(400).json({ error: 'Missing userId' });
+  const { count, error } = await supabase
+    .from('symptom_logs')
+    .select('*', { count: 'exact', head: true })
+    .eq('userId', userId);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ count: count ?? 0 });
+});
+
 module.exports = router;

@@ -45,3 +45,11 @@ export async function logSymptom(symptom: string) {
     body: JSON.stringify({ userId, symptom })
   });
 }
+
+export async function fetchSymptomLogsPerDay() {
+  const userId = await AsyncStorage.getItem('userId');
+  if (!userId) return [];
+  const res = await fetch(`https://pregwell-backend.onrender.com/api/symptom_logs/per-day?userId=${userId}`);
+  if (!res.ok) return [];
+  return await res.json(); // [{ day: 'Sun', count: 2 }, ...]
+}
