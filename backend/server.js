@@ -63,6 +63,7 @@ app.use(dietRoutes);
 app.use(notificationRoutes);
 app.use("/api/chat", chatRoutes);
 app.use('/api/analytics', require('./routes/analyticsRoutes'));
+app.use('/api/symptom_logs', require('./routes/symptomLogsRoutes'));
 
 // Base route
 app.get("/", (req, res) => {

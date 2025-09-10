@@ -1,10 +1,11 @@
 "use client";
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, StatusBar, SafeAreaView, RefreshControl, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, StatusBar, SafeAreaView, RefreshControl, ScrollView, ActivityIndicator, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fetchAnalyticsSummary } from '../lib/analytics';
 import { Ionicons } from '@expo/vector-icons';
+import { BarChart } from 'react-native-chart-kit';
 import { useRouter } from 'expo-router';
 
 interface SummaryData {
@@ -72,6 +73,10 @@ export default function AnalyticsScreen() {
     </View>
   );
 
+  // Example: Simulate symptom logs per day (replace with real data if available)
+  const symptomLogsPerDay = typeof summary?.symptom_logs_7d === 'number' ? [summary.symptom_logs_7d] : [2, 4, 1, 0, 3, 2, 5];
+  const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#667eea" />
@@ -117,6 +122,26 @@ export default function AnalyticsScreen() {
                 {summary?.symptom_logs_7d ? 'Keep logging symptoms to build a clearer health pattern.' : 'Start logging symptoms to generate trends.'}
               </Text>
             </View>
+            <Text style={styles.sectionTitle}>Symptoms Trend (Last 7 Days)</Text>
+            <View style={styles.chartContainer}>
+              <BarChart
+                data={{
+                  labels,
+                  datasets: [{ data: symptomLogsPerDay }]
+                }}
+                width={Dimensions.get('window').width - 32}
+                height={220}
+                chartConfig={{
+                  backgroundColor: '#fff',
+                  backgroundGradientFrom: '#fff',
+                  backgroundGradientTo: '#fff',
+                  decimalPlaces: 0,
+                  color: (opacity = 1) => `rgba(0, 122, 255, ${opacity})`,
+                  labelColor: (opacity = 1) => `rgba(0,0,0,${opacity})`,
+                }}
+                style={{ marginVertical: 8, borderRadius: 16 }}
+              />
+            </View>
           </>
         )}
         <View style={{ height: 40 }} />
@@ -144,5 +169,6 @@ const styles = StyleSheet.create({
   loadingBox: { alignItems:'center', paddingVertical:60 },
   loadingText: { marginTop:12, color:'#667eea', fontSize:14 },
   insightBox: { flexDirection:'row', alignItems:'flex-start', backgroundColor:'#fff', padding:16, borderRadius:16, shadowColor:'#000', shadowOpacity:0.05, shadowOffset:{ width:0, height:2 }, shadowRadius:6, elevation:3 },
-  insightText: { flex:1, marginLeft:10, fontSize:14, color:'#333', lineHeight:20 }
+  insightText: { flex:1, marginLeft:10, fontSize:14, color:'#333', lineHeight:20 },
+  chartContainer: { borderRadius:16, overflow:'hidden', backgroundColor:'#fff', padding:16, marginTop:16, shadowColor:'#000', shadowOpacity:0.1, shadowOffset:{ width:0, height:4 }, shadowRadius:8, elevation:4 }
 });

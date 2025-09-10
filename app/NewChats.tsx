@@ -135,17 +135,7 @@ export default function NewChatsScreen() {
 
               <View style={styles.contactInfo}>
                 <Text style={styles.contactName}>{contact.name}</Text>
-                <View style={styles.statusRow}>
-                  <View
-                    style={[
-                      styles.statusDot,
-                      { backgroundColor: contact.online ? "#4CAF50" : "#BDBDBD" },
-                    ]}
-                  />
-                  <Text style={styles.statusText}>
-                    {contact.online ? "Online" : "Offline"}
-                  </Text>
-                </View>
+                {/* Removed online status dot and text */}
               </View>
 
               <View style={styles.messageButton}>

@@ -26,7 +26,7 @@ router.post('/', async (req, res) => {
     }
     const eventTs = ts ? new Date(ts) : new Date();
 
-    const { error } = await supabase.from('analytics_events').insert([
+    const { error } = await supabase.from('analytics').insert([
       {
         user_id: userId.toString(),
         name,
@@ -47,7 +47,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.get('/api/analytics/summary', async (req, res) => {
+router.get('/summary', async (req, res) => {
   const { userId } = req.query;
   if (!userId) return res.status(400).json({ error: 'Missing userId' });
   try {

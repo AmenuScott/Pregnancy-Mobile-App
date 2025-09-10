@@ -35,3 +35,13 @@ export async function fetchAnalyticsSummary() {
     return null;
   }
 }
+
+export async function logSymptom(symptom: string) {
+  const userId = await AsyncStorage.getItem('userId');
+  if (!userId) return;
+  await fetch('https://pregwell-backend.onrender.com/api/symptom_logs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, symptom })
+  });
+}

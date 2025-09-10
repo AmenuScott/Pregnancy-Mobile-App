@@ -98,9 +98,8 @@ const MessagesScreen = () => {
   useFocusEffect(
     useCallback(() => {
       fetchMessages()
-      // Mark all messages as read when opening Messages screen
-      markAllMessagesAsRead()
-    }, [fetchMessages, markAllMessagesAsRead])
+      // Do NOT mark all messages as read when opening Messages screen
+    }, [fetchMessages])
   )
 
   // 📡 Real-time updates for unread counts
